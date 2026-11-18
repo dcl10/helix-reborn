@@ -1,0 +1,74 @@
+# ============================================================
+# Next.js / Node
+# ============================================================
+node_modules/
+.next/
+out/
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================================
+# .NET / C#
+# ============================================================
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+publish/
+*.nupkg
+*.snupkg
+TestResults/
+coverage/
+
+# ============================================================
+# Terraform
+# ============================================================
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# infra/'s own variables (your IP and SSH key); start from infra/terraform.tfvars.example
+infra/terraform.tfvars
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# ============================================================
+# Secrets / environment
+# ============================================================
+.env*
+!.env.example
+
+# ============================================================
+# Local data
+# ============================================================
+minio-data/
+
+# ============================================================
+# Misc
+# ============================================================
+.DS_Store
+Thumbs.db
+*.log
+.idea/
