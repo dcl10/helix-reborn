@@ -29,6 +29,8 @@ This project is in early development and is not ready for use.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the full design document.
 
+Architecture and conventions: [docs/architecture.md](docs/architecture.md).
+
 ## License
 
 Licensed under the MIT License — see [LICENSE](LICENSE) for details.
