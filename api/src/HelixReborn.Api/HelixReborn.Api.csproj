@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>HelixReborn.Api</RootNamespace>
+    <AssemblyName>HelixReborn.Api</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <UserSecretsId>d2f1a6e4-5b7c-4b9a-9e0a-7c1f3d9b2a6e</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- Versions are managed centrally in api/Directory.Packages.props -->
+  <ItemGroup>
+    <!-- Validates Keycloak-issued access tokens -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- Keycloak admin API client and the helix-api service account's client-credentials tokens (invitations, #6) -->
+    <PackageReference Include="Duende.AccessTokenManagement" />
+    <PackageReference Include="Keycloak.AuthServices.Sdk.Kiota" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- Design-time only: lets dotnet ef build migrations -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Npgsql only requires an older Relational; reference it so it matches the other EF Core packages -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+  </ItemGroup>
+
+</Project>

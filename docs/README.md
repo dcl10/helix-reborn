@@ -9,7 +9,7 @@ exist yet.
 | [local-development.md](local-development.md) | Prerequisites, starting and stopping dependencies, URLs/ports/credentials, resetting data |
 | [auth-setup.md](auth-setup.md) | Local services, realm import, client settings, client secrets, bootstrapping the first admin, inviting users, re-importing the realm |
 | web.md | *(planned)* |
-| api.md | *(planned)* |
+| [api.md](api.md) | Project layout, configuration, auth, running it, migrations, tests |
 | python-services.md | *(planned)* |
 | contracts.md | *(planned)* |
 | pipelines.md | *(planned)* |
