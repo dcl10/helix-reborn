@@ -45,13 +45,15 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────
-  # Keycloak. No realm import yet (#4 adds --import-realm, keycloak/realm-export.json and its volume).
+  # Keycloak. Imports keycloak/realm-export.json on first start (realm "helix").
   # Admin console: http://localhost:8080/admin (bootstrap admin from KC_BOOTSTRAP_ADMIN_*, default admin / admin)
   # Takes 30-60s to start; wait for it before testing.
   # ──────────────────────────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:26.6
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
