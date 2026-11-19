@@ -1,0 +1,153 @@
+# Local dependencies. Two ways to use this file (see docs/local-development.md):
+#   docker compose up -d                          Postgres x2, Keycloak, RabbitMQ, object storage, MailHog
+#   docker compose --profile app up -d --build    the dependencies above, plus web, api and the workers (#39)
+# Every password here is a local-only default. Nothing in this file is used when deployed.
+services:
+  # ──────────────────────────────────────────
+  # API database
+  # Connection string: Host=localhost;Port=5432;Database=helix;Username=helix;Password=dev_password
+  # ──────────────────────────────────────────
+  postgres-app:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: helix
+      POSTGRES_USER: helix
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-app-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helix -d helix"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # Keycloak database, separate from the app's. Exposed on 5433 to avoid clashing with the app DB.
+  # ──────────────────────────────────────────
+  postgres-keycloak:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-keycloak-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # Keycloak. No realm import yet (#4 adds --import-realm, keycloak/realm-export.json and its volume).
+  # Admin console: http://localhost:8080/admin (bootstrap admin from KC_BOOTSTRAP_ADMIN_*, default admin / admin)
+  # Takes 30-60s to start; wait for it before testing.
+  # ──────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6
+    command: ["start-dev"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak_password
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}
+      KC_HTTP_PORT: 8080
+      # One public URL for browsers and tokens (the issuer), while containers reach Keycloak's back-channel
+      # endpoints (token, keys, admin API) at http://keycloak:8080. Outside Docker both are localhost:8080.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # MailHog: catches every email Keycloak sends (invites, password resets).
+  # Inbox: http://localhost:8025 - SMTP: mailhog:1025 inside compose, localhost:1025 outside
+  # ──────────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    logging:
+      driver: "none"
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # RabbitMQ: job queues between the API and the Python workers.
+  # Management UI: http://localhost:15672 (helix / dev_password) - AMQP: localhost:5672
+  # consumer_timeout is raised to 6h in deploy/rabbitmq/rabbitmq.conf; training jobs can run for hours.
+  # ──────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: helix
+      RABBITMQ_DEFAULT_PASS: dev_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./deploy/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/90-helix.conf:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # Object storage (S3 API). datasets, plots, tables and models.
+  #
+  # MinIO stopped publishing images (Docker Hub and the quay.io mirror both reject the pull; see the PR notes),
+  # so this uses RustFS instead, per https://github.com/rustfs/rustfs (maintainer's call, issue #3 comment).
+  # Console: http://localhost:9001 - S3 API: http://localhost:9000 (helix / dev_password)
+  # ──────────────────────────────────────────
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_ACCESS_KEY: helix
+      RUSTFS_SECRET_KEY: dev_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: creates the "helix" bucket. Uses the same image's bundled `rc` client (RustFS's mc-equivalent).
+  rustfs-init:
+    image: rustfs/rustfs:1.0.6
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "rc alias set local http://rustfs:9000 helix dev_password && rc bucket create local/helix --ignore-existing"
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres-app-data:
+  postgres-keycloak-data:
+  rabbitmq-data:
+  rustfs-data:
