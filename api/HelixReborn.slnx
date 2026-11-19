@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HelixReborn.Api/HelixReborn.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HelixReborn.Api.Tests/HelixReborn.Api.Tests.csproj" />
+  </Folder>
+</Solution>
