@@ -19,7 +19,7 @@ file disagree, fix one of them in the same PR.
 | Keycloak | `keycloak/` | Keycloak 26.6 | Sign-in. Realm `helix`, imported from `keycloak/realm-export.json`. |
 | Postgres | (compose) | Postgres 16 | API database `helix`; Keycloak has its own database. |
 | RabbitMQ | (compose) | RabbitMQ 4 with management plugin | Job queues between the API and the workers. |
-| Object storage | (compose: MinIO; prod: DO Spaces) | S3 API | Datasets, plots, tables, models. |
+| Object storage | (compose: RustFS; prod: DO Spaces) | S3 API | Datasets, plots, tables, models. |
 
 ```
 browser ──> web ──/api/proxy──> API ──HTTP (service token)──> EDA service ──> S3
@@ -34,7 +34,7 @@ browser ──> web ──/api/proxy──> API ──HTTP (service token)──
 
 1. **The Python services never touch Postgres.** Everything they need arrives in a message or request, and everything
    they produce goes to S3 plus a job event (workers) or the HTTP response (EDA).
-2. **Only the API is reachable from the web app.** EDA, RabbitMQ, MinIO/Spaces and the workers are internal.
+2. **Only the API is reachable from the web app.** EDA, RabbitMQ, RustFS/Spaces and the workers are internal.
 3. **Every pipeline step must convert to ONNX.** A step is only added to the registry with a test that fits it, converts
    it and checks ONNX predictions match scikit-learn's.
 4. **Evaluation and prediction use the ONNX model**, never a pickled scikit-learn object. No pickles are stored.
@@ -246,7 +246,7 @@ The API uses ASP.NET configuration sections (env vars use `__`, e.g. `S3__Bucket
 | EDA | 8001 (container 8000) |
 | Postgres (app / Keycloak) | 5432 / 5433 |
 | RabbitMQ (AMQP / management UI) | 5672 / 15672 |
-| MinIO (S3 / console) | 9000 / 9001 |
+| RustFS (S3 / console) | 9000 / 9001 |
 | MailHog (SMTP / UI) | 1025 / 8025 |
 
 ## Delivery

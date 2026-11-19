@@ -6,7 +6,7 @@ exist yet.
 | Doc | What it covers |
 | --- | --- |
 | [architecture.md](architecture.md) | Components, design rules, auth, storage layout, messaging contracts, model artifacts, configuration, local ports, delivery |
-| local-development.md | *(planned)* |
+| [local-development.md](local-development.md) | Prerequisites, starting and stopping dependencies, URLs/ports/credentials, resetting data |
 | auth-setup.md | *(planned)* |
 | web.md | *(planned)* |
 | api.md | *(planned)* |
