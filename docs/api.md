@@ -16,14 +16,17 @@ api/
     Program.cs                   composition root
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
-    Config/                      options classes (KeycloakOptions, HelixOptions)
+    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions)
     Controllers/                 one per resource, thin
     Models/                      request/response types
     Data/                        AppDbContext, design-time factory, migrations
     Health/                      /health response writer
+    Services/
+      Invitations/               IInvitationService, InvitationService, InvitationConflictException
+      Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
     Extensions/                  service registration extensions used by Program.cs
   tests/HelixReborn.Api.Tests/
-    Fixtures/                    ApiFactory, test auth handler, test-only admin controller
+    Fixtures/                    ApiFactory, test auth handler, test-only admin controller, InMemoryKeycloakUserAdmin
 ```
 
 ## Configuration
@@ -37,7 +40,10 @@ first use.
 - **`Keycloak`** (`KeycloakOptions`) — `AuthServerUrl`, `Realm` and `Resource` (the `helix-api` client ID) are
   required; the API won't start without them. `RequireHttpsMetadata` defaults to on everywhere except Development,
   and can be forced off for a private, plain-HTTP Keycloak address (e.g. `http://keycloak:8080` inside Compose).
-  `Secret` is for the Keycloak admin API (#6) and isn't needed for token validation.
+  `Secret` is for the Keycloak admin API (invitations) and isn't needed for token validation.
+- **`Invitations`** (`InvitationOptions`) — `AppUrl` (the web app's URL, must be a valid redirect URI of
+  `helix-web`), `ClientId` (`helix-web`) and `ExpiryDays` (default 7), used to build the invited user's action email
+  link.
 - **`Helix`** (`HelixOptions`) — `Version`, reported by `/health` so the deploy workflow can confirm a rollout
   reached the expected image. Set from the image's `HELIX_VERSION` build arg; `"dev"` otherwise.
 
@@ -53,6 +59,34 @@ first use.
 - Controllers read the caller through `ICurrentUser` (`UserId`, `Email`, `IsAdmin`) rather than the claims principal
   directly.
 
+## Invitations
+
+Helix is invite-only: nobody can create their own account. `helix-admin` users invite a colleague by email through
+`InvitationsController`, under `api/invitations` and the `AdminOnly` policy. Errors come back as problem details with
+a readable `detail`.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `GET` | `/api/invitations` | Lists every invitation, newest first, with its current status. |
+| `POST` | `/api/invitations` | Invites an email: creates the Keycloak user and sends the action email. `201` with the invitation. |
+| `POST` | `/api/invitations/{id}/resend` | Resends a pending or expired invitation with a fresh link and expiry. |
+| `POST` | `/api/invitations/{id}/revoke` | Revokes a pending or expired invitation by disabling the Keycloak user. |
+
+`IInvitationService` (`Services/Invitations/`) owns the logic: it checks for an existing Keycloak user, creates one
+through `IKeycloakUserAdmin`, sends Keycloak's `execute-actions-email` for `VERIFY_EMAIL` and `UPDATE_PASSWORD`, and
+records the invitation (who was invited, by whom, when, and the link's expiry) in the `Invitations` table. Status
+(`Pending` / `Accepted` / `Expired` / `Revoked`) is derived on read, not stored — see `Invitation.StatusAt`.
+
+`IKeycloakUserAdmin` (`Services/Keycloak/`) wraps Keycloak's admin REST API via the Kiota client
+(`KeycloakUserAdmin`), authenticating as the `helix-api` service account through
+`Duende.AccessTokenManagement` client-credentials tokens. It requires **`Keycloak:Secret`** to be set — without it,
+every call fails with a `KeycloakAdminException`, surfaced to callers as `502 Bad Gateway`. The app still starts with
+no secret configured; only invitation calls fail. See [auth-setup.md](auth-setup.md#inviting-users) for the full
+flow and `Keycloak:Secret`'s source.
+
+Tests fake `IKeycloakUserAdmin` with `InMemoryKeycloakUserAdmin` (`tests/.../Fixtures/`), which `ApiFactory` registers
+in place of `KeycloakUserAdmin`, so the test suite never calls a real Keycloak.
+
 ## Running it
 
 ```bash
@@ -66,8 +100,8 @@ AirPlay. `GET /api/me` is a quick way to check a token is accepted; `GET /health
 
 ## Migrations
 
-No domain entities yet — the initial migration only creates EF Core's own history table. Domain entities are added by
-later issues.
+The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table; further
+domain entities are added by later issues.
 
 ```bash
 cd api

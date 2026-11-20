@@ -10,6 +10,9 @@ builder.Services.AddAppOptions();
 // Keycloak JWTs; every endpoint requires a signed-in user unless it opts out.
 builder.Services.AddKeycloakAuth(builder.Environment);
 
+// Invitations, sent through the Keycloak admin API as the helix-api service account.
+builder.Services.AddInvitations(builder.Configuration);
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

@@ -1,14 +1,27 @@
 namespace HelixReborn.Api.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Models;
 
 /// <summary>The app database, on Postgres (in tests too).</summary>
 /// <param name="options">Provider and connection settings.</param>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+  /// <summary>Invitations sent by admins.</summary>
+  public DbSet<Invitation> Invitations => Set<Invitation>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
-    // No entities yet: domain entities (experiments, datasets, runs, evaluations) are added by later issues.
+    modelBuilder.Entity<Invitation>(invitation =>
+    {
+      invitation.Property(x => x.Email).HasMaxLength(254);
+      invitation.Property(x => x.KeycloakUserId).HasMaxLength(64);
+      invitation.Property(x => x.InvitedBy).HasMaxLength(64);
+
+      // Not unique: an address whose Keycloak user was deleted can be invited again.
+      invitation.HasIndex(x => x.Email);
+      invitation.HasIndex(x => x.KeycloakUserId).IsUnique();
+    });
   }
 }

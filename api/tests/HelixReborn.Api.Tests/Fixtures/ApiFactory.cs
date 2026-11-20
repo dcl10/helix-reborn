@@ -10,8 +10,10 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
+using Services.Keycloak;
 
 /// <summary>
 /// Test host for integration tests. Each factory gets its own Postgres database, <c>helix_test_&lt;guid&gt;</c>, on
@@ -30,6 +32,9 @@ public class ApiFactory : WebApplicationFactory<Program>
   /// <summary>The <c>postgres-app</c> service in <c>docker-compose.yml</c>, used when the variable isn't set.</summary>
   public const string DefaultServerConnection =
     "Host=localhost;Port=5432;Database=postgres;Username=helix;Password=dev_password";
+
+  /// <summary>The fake Keycloak admin API the app uses, shared by every request to this factory's host.</summary>
+  public InMemoryKeycloakUserAdmin Keycloak { get; } = new();
 
   private readonly string _serverConnection;
   private readonly string _databaseName = $"helix_test_{Guid.NewGuid():N}";
@@ -62,6 +67,10 @@ public class ApiFactory : WebApplicationFactory<Program>
 
       // Controllers in this test assembly (TestAdminController) aren't discovered by default; add them.
       services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
+
+      // Tests never call Keycloak's admin API.
+      services.RemoveAll<IKeycloakUserAdmin>();
+      services.AddSingleton<IKeycloakUserAdmin>(Keycloak);
     });
 
     builder.ConfigureServices(services =>

@@ -147,11 +147,39 @@ only for the Keycloak admin console; it can't sign in to the app, because it liv
 
 ## Inviting users
 
-Admins invite colleagues from the web app (#6, #8): an admin-only page calls the API's invitations endpoints, which
-use the `helix-api` service account to create a disabled-until-set-password Keycloak user and send them a "set your
-password" action email. Nobody can get an account any other way, because self-registration is off. The invited user
-gets `helix-user` automatically (the default role); an admin assigns `helix-admin` afterwards in the Keycloak admin
-console, or the app does, once that's built.
+Admins invite colleagues from the **Users** page in the web app (#8). Nobody can get an account any other way:
+self-registration is off.
+
+**What an invite does.** The API (`InvitationsController`, `api/invitations`, `AdminOnly`) checks whether the email
+already belongs to a Keycloak user and rejects duplicates with `409`. Otherwise it creates the user — enabled, email
+not yet verified, with the default `helix-user` role given automatically by Keycloak — and asks Keycloak to email a
+link (`execute-actions-email`) for `VERIFY_EMAIL` and `UPDATE_PASSWORD`. The link expires after
+`Invitations:ExpiryDays` (7 by default). Each invite is also saved in the `Invitations` table, with the inviting
+admin, the send time and the expiry. If the email can't be sent, the Keycloak user is deleted so the admin can retry.
+
+**What the invitee does.** They open the link, verify their email, set a password of at least 12 characters, then land
+back on `Invitations:AppUrl` (`helix-web`'s URL) signed in. Locally, emails appear in MailHog at
+`http://localhost:8025`.
+
+**Statuses**, computed when read, not stored (`Invitation.StatusAt`): `Revoked` wins over everything; otherwise a
+verified email means `Accepted`; an unaccepted invitation past its expiry is `Expired`; otherwise `Pending`.
+
+**Resend and revoke** apply only to `Pending` or `Expired` invitations (`POST .../resend`, `POST .../revoke`), `409`
+otherwise. Resending sends a new email and a fresh expiry. Revoking disables the Keycloak user, so the link stops
+working; the user isn't deleted, so the address can't be reinvited until someone deletes or re-enables it in the
+Keycloak admin console.
+
+**Management.** Accepted users are managed in the Keycloak admin console, not the app — assigning `helix-admin`, for
+instance.
+
+**Configuration.** `Keycloak:Secret` for `helix-api` must be set, or invites fail with `502 Bad Gateway`.
+`Invitations:AppUrl`, `Invitations:ClientId` and `Invitations:ExpiryDays` control the link's return URL, client and
+lifetime. Deployed, `AppUrl` must match one of `helix-web`'s valid redirect URIs.
+
+**Under the hood.** The API calls Keycloak's admin REST API as `helix-api` using client credentials
+(`Duende.AccessTokenManagement`), with tokens cached until they expire. The Keycloak calls sit behind
+`IKeycloakUserAdmin`, so tests use an in-memory fake instead of a real Keycloak. See
+[api.md](api.md#invitations) for the endpoint table and service details.
 
 ## Re-importing the realm
 
