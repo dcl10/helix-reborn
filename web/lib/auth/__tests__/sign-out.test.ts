@@ -14,9 +14,7 @@ describe("buildKeycloakLogoutUrl", () => {
     });
 
     expect(url?.origin).toBe("http://localhost:8080");
-    expect(url?.pathname).toBe(
-      "/realms/helix/protocol/openid-connect/logout",
-    );
+    expect(url?.pathname).toBe("/realms/helix/protocol/openid-connect/logout");
     expect(Object.fromEntries(url?.searchParams ?? [])).toEqual({
       id_token_hint: "id-token",
       client_id: "helix-web",

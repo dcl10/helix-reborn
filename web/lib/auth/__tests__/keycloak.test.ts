@@ -32,10 +32,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW * 1000);
   vi.stubGlobal("fetch", fetchMock);
-  vi.stubEnv(
-    "AUTH_KEYCLOAK_ISSUER",
-    "http://localhost:8080/realms/helix",
-  );
+  vi.stubEnv("AUTH_KEYCLOAK_ISSUER", "http://localhost:8080/realms/helix");
   vi.stubEnv("AUTH_KEYCLOAK_ID", "helix-web");
   vi.stubEnv("AUTH_KEYCLOAK_SECRET", "web-secret");
   vi.spyOn(console, "error").mockImplementation(() => {});

@@ -4,8 +4,7 @@ import { keycloakFetch, toInternalKeycloakUrl } from "../keycloak-url";
 
 const env = {
   AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/helix",
-  AUTH_KEYCLOAK_INTERNAL_ISSUER:
-    "http://keycloak:8080/realms/helix",
+  AUTH_KEYCLOAK_INTERNAL_ISSUER: "http://keycloak:8080/realms/helix",
 };
 
 describe("toInternalKeycloakUrl", () => {
