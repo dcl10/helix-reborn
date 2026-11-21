@@ -14,7 +14,7 @@ exist yet.
 | [contracts.md](contracts.md) | Why the message contracts exist, each message with an example, ack/reject rules, how to regenerate them |
 | pipelines.md | *(planned)* |
 | evaluation.md | *(planned)* |
-| deployment.md | *(planned)* |
+| [deployment.md](deployment.md) | Infrastructure: what Terraform creates, one-time manual steps, variables, running it locally, outputs, teardown |
 | user-guide.md | *(planned)* |
 
 When you add a doc, replace its *(planned)* entry with a link.
