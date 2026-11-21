@@ -10,7 +10,7 @@ exist yet.
 | [auth-setup.md](auth-setup.md) | Local services, realm import, client settings, client secrets, bootstrapping the first admin, inviting users, re-importing the realm |
 | [web.md](web.md) | Running it, layout, public pages, sign-in and the session, stack, shadcn components |
 | [api.md](api.md) | Project layout, configuration, auth, running it, migrations, tests |
-| python-services.md | *(planned)* |
+| [python-services.md](python-services.md) | Workspace layout, helix-core vs a service, commands, conventions, tests |
 | contracts.md | *(planned)* |
 | pipelines.md | *(planned)* |
 | evaluation.md | *(planned)* |
