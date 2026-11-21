@@ -3,7 +3,13 @@ name = "helix-core"
 version = "0.1.0"
 description = "Shared library for Helix Reborn's Python services (EDA, training, evaluation)."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "boto3>=1.35",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+]
 
 [build-system]
 requires = ["hatchling"]
