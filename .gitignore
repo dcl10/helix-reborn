@@ -39,6 +39,9 @@ override.tf.json
 # infra/'s own variables (your IP and SSH key); start from infra/terraform.tfvars.example
 infra/terraform.tfvars
 
+# infra/'s backend config (Spaces bucket for remote state); start from infra/backend.hcl.example
+infra/backend.hcl
+
 # ============================================================
 # Python
 # ============================================================

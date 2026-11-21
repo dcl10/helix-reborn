@@ -1,0 +1,237 @@
+{
+  "$defs": {
+    "PipelineSpec": {
+      "additionalProperties": false,
+      "description": "The full specification of a training pipeline.\n\nSent as part of :class:`TrainingJob`. ``steps`` are applied in order before the\nsingle ``model`` step.",
+      "properties": {
+        "feature_columns": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Feature Columns",
+          "type": "array"
+        },
+        "id_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id Column"
+        },
+        "model": {
+          "$ref": "#/$defs/StepSpec"
+        },
+        "problem_type": {
+          "enum": [
+            "classification",
+            "regression"
+          ],
+          "title": "Problem Type",
+          "type": "string"
+        },
+        "search": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "split": {
+          "$ref": "#/$defs/SplitSpec",
+          "default": {
+            "cv_folds": null,
+            "random_seed": 42,
+            "test_size": 0.2
+          }
+        },
+        "steps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/StepSpec"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "target_column": {
+          "title": "Target Column",
+          "type": "string"
+        }
+      },
+      "required": [
+        "problem_type",
+        "target_column",
+        "feature_columns",
+        "model"
+      ],
+      "title": "PipelineSpec",
+      "type": "object"
+    },
+    "SearchSpec": {
+      "additionalProperties": false,
+      "description": "Hyperparameter search configuration on the training portion.",
+      "properties": {
+        "cv_folds": {
+          "default": 5,
+          "maximum": 10,
+          "minimum": 2,
+          "title": "Cv Folds",
+          "type": "integer"
+        },
+        "method": {
+          "enum": [
+            "grid",
+            "random"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "n_iter": {
+          "anyOf": [
+            {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Iter"
+        },
+        "param_grid": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {},
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Param Grid"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "SearchSpec",
+      "type": "object"
+    },
+    "SplitSpec": {
+      "additionalProperties": false,
+      "description": "How a dataset is split into training and test portions.",
+      "properties": {
+        "cv_folds": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cv Folds"
+        },
+        "random_seed": {
+          "default": 42,
+          "title": "Random Seed",
+          "type": "integer"
+        },
+        "test_size": {
+          "default": 0.2,
+          "maximum": 0.5,
+          "minimum": 0.05,
+          "title": "Test Size",
+          "type": "number"
+        }
+      },
+      "title": "SplitSpec",
+      "type": "object"
+    },
+    "StepSpec": {
+      "additionalProperties": false,
+      "description": "One step in a pipeline: a catalog id plus its parameters.\n\nThe ``step`` id is validated against the pipeline catalog registry (see #22);\nthis model only constrains its shape.",
+      "properties": {
+        "params": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Params",
+          "type": "object"
+        },
+        "step": {
+          "title": "Step",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step"
+      ],
+      "title": "StepSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A training job sent from the API to the training worker on ``training.jobs``.",
+  "properties": {
+    "dataset_key": {
+      "title": "Dataset Key",
+      "type": "string"
+    },
+    "experiment_id": {
+      "format": "uuid",
+      "title": "Experiment Id",
+      "type": "string"
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "output_prefix": {
+      "title": "Output Prefix",
+      "type": "string"
+    },
+    "pipeline": {
+      "$ref": "#/$defs/PipelineSpec"
+    },
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "job_id",
+    "run_id",
+    "experiment_id",
+    "dataset_key",
+    "output_prefix",
+    "pipeline"
+  ],
+  "title": "TrainingJob",
+  "type": "object"
+}

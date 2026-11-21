@@ -11,10 +11,10 @@ exist yet.
 | [web.md](web.md) | Running it, layout, public pages, sign-in and the session, stack, shadcn components |
 | [api.md](api.md) | Project layout, configuration, auth, running it, migrations, tests |
 | [python-services.md](python-services.md) | Workspace layout, helix-core vs a service, commands, conventions, tests |
-| contracts.md | *(planned)* |
+| [contracts.md](contracts.md) | Why the message contracts exist, each message with an example, ack/reject rules, how to regenerate them |
 | pipelines.md | *(planned)* |
 | evaluation.md | *(planned)* |
-| deployment.md | *(planned)* |
+| [deployment.md](deployment.md) | Infrastructure: what Terraform creates, one-time manual steps, variables, running it locally, outputs, teardown |
 | user-guide.md | *(planned)* |
 
 When you add a doc, replace its *(planned)* entry with a link.
