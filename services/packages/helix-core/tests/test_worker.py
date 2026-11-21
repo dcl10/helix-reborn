@@ -196,14 +196,14 @@ async def test_worker_publishes_started_and_succeeded_to_jobs_events(
 
     connection = await aio_pika.connect_robust(settings.rabbitmq_url.get_secret_value())
     try:
-        channel = await connection.channel()
-        events_queue = await channel.get_queue(EVENTS_QUEUE)
-
         for _ in range(50):
             if worker.is_ready():
                 break
             await asyncio.sleep(0.1)
         assert worker.is_ready()
+
+        channel = await connection.channel()
+        events_queue = await channel.get_queue(EVENTS_QUEUE)
 
         await channel.default_exchange.publish(
             aio_pika.Message(
