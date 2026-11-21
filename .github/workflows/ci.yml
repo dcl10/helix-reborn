@@ -1,0 +1,109 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      python: ${{ steps.filter.outputs.python }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web: ['web/**']
+            api: ['api/**', 'contracts/**']
+            python: ['services/**', 'contracts/**']
+            terraform: ['infra/**', 'deploy/**/*.tf']
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: web } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: corepack enable npm
+      - run: npm ci
+      - run: npm run lint -- --max-warnings=0
+      - run: npx vitest run
+      - run: npm run build
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: api } }
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: helix, POSTGRES_PASSWORD: dev_password, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U helix -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with: { dotnet-version: 10.0.x }
+      - run: dotnet build -warnaserror
+      - run: dotnet test --no-build
+        env:
+          HELIX_TEST_POSTGRES: Host=localhost;Port=5432;Database=postgres;Username=helix;Password=dev_password
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: services } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v6
+        with: { enable-cache: true, cache-dependency-glob: services/uv.lock }
+      - run: uv sync --all-packages --all-groups --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+      - run: uv run python -m helix_core.contracts check
+
+  terraform:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform fmt -check -recursive -diff infra
+      - run: |
+          if compgen -G "infra/*.tf" > /dev/null; then
+            terraform -chdir=infra init -backend=false -input=false
+            terraform -chdir=infra validate
+          fi
+
+  ci-ok:
+    if: always()
+    needs: [changes, web, api, python, terraform]
+    runs-on: ubuntu-latest
+    steps:
+      - name: fail if any job failed or was cancelled
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if echo '${{ toJSON(needs) }}' | grep -qE '"result": "(failure|cancelled)"'; then exit 1; fi

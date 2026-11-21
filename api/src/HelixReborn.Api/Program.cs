@@ -3,6 +3,8 @@ using HelixReborn.Api.Extensions;
 using HelixReborn.Api.Health;
 using Microsoft.EntityFrameworkCore;
 
+// A comment to trigger the workflow in API
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddAppOptions();
