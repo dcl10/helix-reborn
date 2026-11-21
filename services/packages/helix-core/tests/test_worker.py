@@ -1,14 +1,17 @@
+import asyncio
+import json
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid4
 
+import aio_pika
 import pytest
 from pydantic import BaseModel
 
 from helix_core.errors import InvalidDataError
-from helix_core.messages import JobEvent
+from helix_core.messages import JobEvent, PipelineSpec, StepSpec, TrainingJob
 from helix_core.settings import HelixSettings
-from helix_core.worker import Worker
+from helix_core.worker import EVENTS_QUEUE, TRAINING_QUEUE, Worker
 
 
 class _Job(BaseModel):
@@ -151,3 +154,77 @@ async def test_process_emits_progress_from_the_handler_thread_in_order(
         ("progress", 0.6),
         ("succeeded", None),
     ]
+
+
+class _TrivialTrainingWorker(Worker[TrainingJob]):
+    """A worker whose `handle` does nothing but succeed, for the integration test."""
+
+    queue_name = TRAINING_QUEUE
+    job_type = "training"
+    job_model = TrainingJob
+
+    def entity_id(self, job: TrainingJob) -> UUID:
+        return job.run_id
+
+    def handle(self, job: TrainingJob, emit: Callable[..., None]) -> dict[str, Any]:
+        return {"ok": True}
+
+
+def _training_job_body() -> bytes:
+    job = TrainingJob(
+        job_id=uuid4(),
+        run_id=uuid4(),
+        experiment_id=uuid4(),
+        dataset_key="experiments/e/datasets/d/data.csv",
+        output_prefix="experiments/e/runs/r/",
+        pipeline=PipelineSpec(
+            problem_type="classification",
+            target_column="label",
+            feature_columns=["a", "b"],
+            model=StepSpec(step="random_forest_classifier"),
+        ),
+    )
+    return job.model_dump_json().encode("utf-8")
+
+
+@pytest.mark.integration
+async def test_worker_publishes_started_and_succeeded_to_jobs_events(
+    settings: HelixSettings,
+) -> None:
+    worker = _TrivialTrainingWorker(settings)
+    run_task = asyncio.ensure_future(worker.run())
+
+    connection = await aio_pika.connect_robust(settings.rabbitmq_url.get_secret_value())
+    try:
+        channel = await connection.channel()
+        events_queue = await channel.get_queue(EVENTS_QUEUE)
+
+        for _ in range(50):
+            if worker.is_ready():
+                break
+            await asyncio.sleep(0.1)
+        assert worker.is_ready()
+
+        await channel.default_exchange.publish(
+            aio_pika.Message(
+                body=_training_job_body(),
+                content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            ),
+            routing_key=TRAINING_QUEUE,
+        )
+
+        events = []
+        async with events_queue.iterator() as queue_iter:
+            async for message in queue_iter:
+                async with message.process():
+                    events.append(json.loads(message.body))
+                if len(events) == 2:
+                    break
+
+        assert [event["status"] for event in events] == ["started", "succeeded"]
+        assert events[1]["result"] == {"ok": True}
+    finally:
+        worker.request_stop()
+        await asyncio.wait_for(run_task, timeout=5)
+        await connection.close()
