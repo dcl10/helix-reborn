@@ -23,7 +23,7 @@ export const navItems: NavItem[] = [
 
 /**
  * The main navigation links, with the current section highlighted. Reads the URL, which on a route with a dynamic
- * segment (such as `/chat/[id]`) is only known per request, so it suspends there: render it inside a `<Suspense>`
+ * segment (such as `/experiments/[id]`) is only known per request, so it suspends there: render it inside a `<Suspense>`
  * boundary whose fallback is {@link MainNavLinks} with no `pathname`.
  * @param isAdmin - whether to show admin-only links
  * @returns the nav bar

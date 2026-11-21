@@ -14,7 +14,7 @@ import type { SessionUser } from "@/lib/auth/types";
 export function HeaderNav({ user }: { user?: SessionUser | null }) {
   return (
     <>
-      {/* The highlight needs the URL, unknown until request time on dynamic routes such as /chat/[id]. */}
+      {/* The highlight needs the URL, unknown until request time on dynamic routes such as /experiments/[id]. */}
       <Suspense fallback={<MainNavLinks isAdmin={user?.isAdmin ?? false} />}>
         <MainNav isAdmin={user?.isAdmin ?? false} />
       </Suspense>

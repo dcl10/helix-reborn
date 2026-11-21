@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 /**
  * The API's health, fetched with a short timeout so a stuck or unreachable API doesn't hold this route up.
  * @returns the parsed JSON body, or null when the request fails or times out
