@@ -14,7 +14,7 @@ exist yet.
 | contracts.md | *(planned)* |
 | pipelines.md | *(planned)* |
 | evaluation.md | *(planned)* |
-| deployment.md | *(planned)* |
+| [deployment.md](deployment.md) | Infrastructure: what Terraform creates, one-time manual steps, variables, running it locally, outputs, teardown |
 | user-guide.md | *(planned)* |
 
 When you add a doc, replace its *(planned)* entry with a link.
