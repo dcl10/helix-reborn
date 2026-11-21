@@ -1,3 +1,4 @@
+# Comment to trigger workflow
 locals {
   # sslip.io resolves app.203-0-113-7.sslip.io to 203.0.113.7, so no DNS is needed without a domain.
   base_domain = var.domain != "" ? var.domain : "${replace(digitalocean_reserved_ip.host.ip_address, ".", "-")}.sslip.io"
