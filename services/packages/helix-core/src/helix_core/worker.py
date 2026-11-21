@@ -170,7 +170,12 @@ class Worker[JobT: BaseModel](ABC):
             self._loop.call_soon_threadsafe(self._stop_event.set)
 
     async def run(self) -> None:
-        """Connect, declare topology, set prefetch 1, and consume until stopped."""
+        """Connect, declare topology, set prefetch 1, and consume until stopped.
+
+        Consumes via a callback (not the queue iterator) so that a stop request is
+        acted on immediately even while idle between messages, rather than only
+        being noticed when the next message arrives.
+        """
         self._loop = asyncio.get_running_loop()
         self._stop_event = asyncio.Event()
         if self._stop_requested:
@@ -192,40 +197,32 @@ class Worker[JobT: BaseModel](ABC):
         await declare_topology(channel)
         queue = await channel.get_queue(self.queue_name)
 
+        in_flight: dict[str, Any] = {}
+
+        async def on_message(message: aio_pika.abc.AbstractIncomingMessage) -> None:
+            task = asyncio.ensure_future(self.process(message))
+            in_flight["task"] = task
+            in_flight["message"] = message
+            try:
+                await task
+            finally:
+                in_flight.clear()
+
+        consumer_tag = await queue.consume(on_message)
         self._consuming = True
         try:
-            async with queue.iterator() as queue_iter:
-                async for message in queue_iter:
-                    if self._stop_requested:
-                        await message.nack(requeue=True)
-                        break
-                    await self._process_with_grace(message)
-                    if self._stop_requested:
-                        break
+            await self._stop_event.wait()
         finally:
             self._consuming = False
+            await queue.cancel(consumer_tag)
+            task = in_flight.get("task")
+            if task is not None and not task.done():
+                try:
+                    await asyncio.wait_for(task, timeout=self.shutdown_grace_seconds)
+                except TimeoutError:
+                    task.cancel()
+                    await in_flight["message"].nack(requeue=True)
             await connection.close()
-
-    async def _process_with_grace(
-        self, message: aio_pika.abc.AbstractIncomingMessage
-    ) -> None:
-        assert self._stop_event is not None
-        task = asyncio.ensure_future(self.process(message))
-        stop_wait = asyncio.ensure_future(self._stop_event.wait())
-        try:
-            done, _ = await asyncio.wait(
-                {task, stop_wait}, return_when=asyncio.FIRST_COMPLETED
-            )
-            if task in done:
-                task.result()
-                return
-            try:
-                await asyncio.wait_for(task, timeout=self.shutdown_grace_seconds)
-            except TimeoutError:
-                task.cancel()
-                await message.nack(requeue=True)
-        finally:
-            stop_wait.cancel()
 
     async def process(self, message: aio_pika.abc.AbstractIncomingMessage) -> None:
         """Handle one incoming message: parse, run the job, publish events, ack/reject.
