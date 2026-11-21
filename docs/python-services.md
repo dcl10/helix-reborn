@@ -76,3 +76,37 @@ real external services.
 
 Tests that need RabbitMQ, MinIO or Keycloak are marked `@pytest.mark.integration` and are skipped unless
 `HELIX_INTEGRATION=1` is set in the environment.
+
+## Settings and storage
+
+`helix_core.settings.HelixSettings` (pydantic-settings) is the only way services read configuration; nothing else
+reads `os.environ` directly. Call `helix_core.settings.get_settings()` to get the process-wide, cached instance.
+
+| Variable | Default (local) | Used by |
+|---|---|---|
+| `HELIX_S3_ENDPOINT_URL` | `http://localhost:9000` | all |
+| `HELIX_S3_REGION` | `us-east-1` | all |
+| `HELIX_S3_ACCESS_KEY` / `HELIX_S3_SECRET_KEY` | `helix` / `dev_password` | all |
+| `HELIX_S3_BUCKET` | `helix` | all |
+| `HELIX_RABBITMQ_URL` | `amqp://helix:dev_password@localhost:5672/` | workers |
+| `HELIX_WORKER_CPUS` | `1` | workers (`n_jobs` for scikit-learn/joblib) |
+| `HELIX_HEALTH_PORT` | `8080` | workers |
+| `HELIX_KEYCLOAK_ISSUER` | `http://localhost:8080/realms/helix` | EDA |
+| `HELIX_KEYCLOAK_JWKS_URL` | issuer + `/protocol/openid-connect/certs` | EDA |
+| `HELIX_EDA_AUDIENCE` | `helix-eda` | EDA |
+| `HELIX_LOG_LEVEL` | `INFO` | all |
+| `HELIX_VERSION` | `dev` | all (baked in at image build) |
+
+`s3_access_key`, `s3_secret_key` and `rabbitmq_url` are `SecretStr`: use `.get_secret_value()` only where a value is
+actually needed (building a client), never in logs or `repr`.
+
+`helix_core.storage.Storage` wraps a boto3 S3 client bound to one bucket (`Storage.from_settings()` builds one from
+`HelixSettings`, with path-style addressing, which MinIO/RustFS needs). It offers `get_bytes`/`put_bytes`,
+`get_json`/`put_json`, `exists`, and `download_file`/`upload_file`; a missing or unreadable object raises
+`helix_core.errors.StorageError`. `helix_core.storage.join_key` joins S3 key segments with single slashes.
+
+`helix_core.datasets` loads and validates tabular data per the data rules in
+[architecture.md](architecture.md#data-rules-v1): `load_csv` reads a CSV from S3 (raising
+`helix_core.errors.InvalidDataError` if it's empty or unreadable), `select_features_target` splits a dataframe into
+features/target/IDs after checking the named columns exist, the features are numeric, and the target/ID columns
+aren't also features, and `numeric_columns` lists a dataframe's numeric columns.
