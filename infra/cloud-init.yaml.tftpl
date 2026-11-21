@@ -1,0 +1,43 @@
+#cloud-config
+# First boot of the host: mount the data volume, install Docker with its data on the volume, add swap, clone the
+# repo onto the volume, create its root-only .env (deploy/init-env.sh, see #42) and enable the auto-update timer
+# (deploy/systemd/helix-update.timer, see #42) if the checkout has them yet.
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - openssl
+  - unattended-upgrades
+
+write_files:
+  # Docker keeps images, containers and volumes (both databases) on the data volume.
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "data-root": "${data_mount}/docker",
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" }
+      }
+
+runcmd:
+  # DigitalOcean formats the volume (ext4) when it's created; mount it before Docker starts.
+  - mkdir -p ${data_mount}
+  - [sh, -c, "grep -q ' ${data_mount} ' /etc/fstab || echo '${volume_device} ${data_mount} ext4 defaults,nofail,discard 0 2' >> /etc/fstab"]
+  - mount -a
+  # Swap, so training jobs and image pulls don't run the droplet out of memory.
+  - [sh, -c, "if [ ! -f /swapfile ]; then fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab; fi; swapon -a"]
+  # Docker Engine and the Compose plugin, from Docker's apt repository. The droplet pulls images; it doesn't build them.
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - [sh, -c, 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list']
+  - apt-get update
+  - [sh, -c, "DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"]
+  - systemctl enable --now docker
+  # The checkout lives on the volume too, so a replaced droplet finds it again.
+  - [sh, -c, "if [ ! -d ${app_dir}/.git ]; then git clone --branch ${repo_ref} ${repo_url} ${app_dir}; fi"]
+  # deploy/init-env.sh and the auto-update timer are added by a later issue; run/enable them only once they exist.
+  - [sh, -c, "if [ -x ${app_dir}/deploy/init-env.sh ]; then ${app_dir}/deploy/init-env.sh ${app_host} ${auth_host}; fi"]
+  - [sh, -c, "if [ -f ${app_dir}/deploy/systemd/helix-update.service ]; then cp ${app_dir}/deploy/systemd/helix-update.service ${app_dir}/deploy/systemd/helix-update.timer /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now helix-update.timer; fi"]
