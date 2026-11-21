@@ -8,7 +8,7 @@ exist yet.
 | [architecture.md](architecture.md) | Components, design rules, auth, storage layout, messaging contracts, model artifacts, configuration, local ports, delivery |
 | [local-development.md](local-development.md) | Prerequisites, starting and stopping dependencies, URLs/ports/credentials, resetting data |
 | [auth-setup.md](auth-setup.md) | Local services, realm import, client settings, client secrets, bootstrapping the first admin, inviting users, re-importing the realm |
-| web.md | *(planned)* |
+| [web.md](web.md) | Running it, layout, public pages, sign-in and the session, stack, shadcn components |
 | [api.md](api.md) | Project layout, configuration, auth, running it, migrations, tests |
 | python-services.md | *(planned)* |
 | contracts.md | *(planned)* |
