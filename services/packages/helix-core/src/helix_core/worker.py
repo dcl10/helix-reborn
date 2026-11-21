@@ -11,7 +11,7 @@ import os
 import signal
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any, ClassVar, Generic, Literal, Protocol, TypeVar
+from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
 import aio_pika
@@ -31,6 +31,7 @@ EVENTS_QUEUE = "jobs.events"
 DLX = "helix.dlx"
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 25
+
 
 class EventPublisher(Protocol):
     """Publishes a :class:`~helix_core.messages.JobEvent` for the job being handled."""
@@ -85,7 +86,7 @@ async def declare_topology(channel: aio_pika.abc.AbstractChannel) -> None:
     await channel.declare_queue(EVENTS_QUEUE, durable=True)
 
 
-class Worker(ABC, Generic[JobT]):
+class Worker[JobT: BaseModel](ABC):
     """Consumes one job queue, one job at a time, and reports JobEvents.
 
     Subclasses set the class variables ``queue_name``, ``job_type`` and ``job_model``,
@@ -121,7 +122,7 @@ class Worker(ABC, Generic[JobT]):
 
     @abstractmethod
     def entity_id(self, job: JobT) -> UUID:
-        """Return the entity id (``run_id`` or ``evaluation_id``) a job refers to.
+        r"""Return the entity id (``run_id`` or ``evaluation_id``) a job refers to.
 
         Args:
             job: The parsed job message.
