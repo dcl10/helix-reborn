@@ -1,0 +1,292 @@
+{
+  "$defs": {
+    "EvaluationOptions": {
+      "additionalProperties": false,
+      "description": "Options controlling what the evaluation worker computes and plots.",
+      "properties": {
+        "ensemble_methods": {
+          "default": [],
+          "items": {
+            "enum": [
+              "mean",
+              "majority_vote"
+            ],
+            "type": "string"
+          },
+          "title": "Ensemble Methods",
+          "type": "array"
+        },
+        "fuzzy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FuzzyOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "global_methods": {
+          "default": [
+            "permutation",
+            "shap"
+          ],
+          "items": {
+            "enum": [
+              "permutation",
+              "shap"
+            ],
+            "type": "string"
+          },
+          "title": "Global Methods",
+          "type": "array"
+        },
+        "local_max_samples": {
+          "default": 50,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Local Max Samples",
+          "type": "integer"
+        },
+        "local_methods": {
+          "default": [],
+          "items": {
+            "enum": [
+              "lime",
+              "shap"
+            ],
+            "type": "string"
+          },
+          "title": "Local Methods",
+          "type": "array"
+        },
+        "num_features_to_plot": {
+          "default": 10,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Num Features To Plot",
+          "type": "integer"
+        },
+        "permutation_repeats": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Permutation Repeats",
+          "type": "integer"
+        },
+        "plot_options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlotOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "plots": {
+          "default": true,
+          "title": "Plots",
+          "type": "boolean"
+        }
+      },
+      "title": "EvaluationOptions",
+      "type": "object"
+    },
+    "FuzzyOptions": {
+      "additionalProperties": false,
+      "description": "Options for fuzzy-logic interpretability outputs during evaluation.",
+      "properties": {
+        "cluster_names": {
+          "default": [
+            "very low",
+            "low",
+            "medium",
+            "high",
+            "very high"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Cluster Names",
+          "type": "array"
+        },
+        "granular_features": {
+          "default": true,
+          "title": "Granular Features",
+          "type": "boolean"
+        },
+        "number_clusters": {
+          "default": 5,
+          "maximum": 10,
+          "minimum": 2,
+          "title": "Number Clusters",
+          "type": "integer"
+        },
+        "number_fuzzy_features": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Number Fuzzy Features",
+          "type": "integer"
+        },
+        "number_rules": {
+          "default": 5,
+          "minimum": 1,
+          "title": "Number Rules",
+          "type": "integer"
+        }
+      },
+      "title": "FuzzyOptions",
+      "type": "object"
+    },
+    "PlotOptions": {
+      "additionalProperties": false,
+      "description": "Shared plot styling options.\n\nPart of the wire contract because :class:`EvaluationOptions` sends it to the\nevaluation worker; also reused by the EDA service (#17).",
+      "properties": {
+        "axis_font_size": {
+          "default": 12,
+          "title": "Axis Font Size",
+          "type": "integer"
+        },
+        "colour_map": {
+          "default": "viridis",
+          "title": "Colour Map",
+          "type": "string"
+        },
+        "dpi": {
+          "default": 150,
+          "maximum": 600,
+          "minimum": 50,
+          "title": "Dpi",
+          "type": "integer"
+        },
+        "font_family": {
+          "default": "sans-serif",
+          "title": "Font Family",
+          "type": "string"
+        },
+        "height": {
+          "default": 8,
+          "title": "Height",
+          "type": "number"
+        },
+        "rotate_x_labels": {
+          "default": 0,
+          "title": "Rotate X Labels",
+          "type": "integer"
+        },
+        "rotate_y_labels": {
+          "default": 0,
+          "title": "Rotate Y Labels",
+          "type": "integer"
+        },
+        "style": {
+          "default": "whitegrid",
+          "title": "Style",
+          "type": "string"
+        },
+        "tick_size": {
+          "default": 10,
+          "title": "Tick Size",
+          "type": "integer"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "title_font_size": {
+          "default": 14,
+          "title": "Title Font Size",
+          "type": "integer"
+        },
+        "width": {
+          "default": 10,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "title": "PlotOptions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An evaluation job sent from the API to the evaluation worker.\n\nSent on ``evaluation.jobs``.",
+  "properties": {
+    "dataset_key": {
+      "title": "Dataset Key",
+      "type": "string"
+    },
+    "evaluation_id": {
+      "format": "uuid",
+      "title": "Evaluation Id",
+      "type": "string"
+    },
+    "experiment_id": {
+      "format": "uuid",
+      "title": "Experiment Id",
+      "type": "string"
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "model_prefix": {
+      "title": "Model Prefix",
+      "type": "string"
+    },
+    "options": {
+      "$ref": "#/$defs/EvaluationOptions",
+      "default": {
+        "ensemble_methods": [],
+        "fuzzy": null,
+        "global_methods": [
+          "permutation",
+          "shap"
+        ],
+        "local_max_samples": 50,
+        "local_methods": [],
+        "num_features_to_plot": 10,
+        "permutation_repeats": 10,
+        "plot_options": null,
+        "plots": true
+      }
+    },
+    "output_prefix": {
+      "title": "Output Prefix",
+      "type": "string"
+    },
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "job_id",
+    "evaluation_id",
+    "run_id",
+    "experiment_id",
+    "dataset_key",
+    "model_prefix",
+    "output_prefix"
+  ],
+  "title": "EvaluationJob",
+  "type": "object"
+}
