@@ -84,7 +84,11 @@ public class ExperimentService(AppDbContext db, IObjectStorage storage, TimeProv
       experiment.Name = name;
     }
 
-    experiment.Description = description;
+    if (description is not null)
+    {
+      experiment.Description = description;
+    }
+
     experiment.UpdatedAt = time.GetUtcNow();
 
     await db.SaveChangesAsync(cancellationToken);
