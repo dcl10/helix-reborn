@@ -60,7 +60,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         .Metadata.SetValueComparer(new ValueComparer<List<DatasetColumn>>(
           (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
           v => v.Aggregate(0, (hash, x) => HashCode.Combine(hash, x.GetHashCode())),
-          v => [.. v]));
+          v => v.ToList()));
 
       dataset.HasIndex(x => x.ExperimentId).IsUnique();
     });

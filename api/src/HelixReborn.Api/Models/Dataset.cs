@@ -18,7 +18,7 @@ public class Dataset
   /// <summary>Size of the uploaded file, in bytes.</summary>
   public long SizeBytes { get; set; }
 
-  /// <summary>The S3 key the file is stored at, see <see cref="Storage.StorageKeys.Dataset"/>.</summary>
+  /// <summary>The S3 key the file is stored at, see <see cref="Services.Storage.StorageKeys.Dataset(Guid, Guid, string)"/>.</summary>
   public required string StorageKey { get; set; }
 
   /// <summary>Number of data rows (excluding the header).</summary>
