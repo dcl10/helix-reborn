@@ -71,7 +71,8 @@ public class S3ObjectStorage(IAmazonS3 client, IOptions<S3Options> options) : IO
         new ListObjectsV2Request { BucketName = _bucket, Prefix = prefix, ContinuationToken = continuationToken },
         cancellationToken);
 
-      objects.AddRange(response.S3Objects.Select(x => new StoredObject(x.Key, x.Size, x.LastModified)));
+      objects.AddRange(response.S3Objects.Select(x =>
+        new StoredObject(x.Key, x.Size ?? 0, x.LastModified ?? default)));
       continuationToken = response.IsTruncated == true ? response.NextContinuationToken : null;
     }
     while (continuationToken is not null);

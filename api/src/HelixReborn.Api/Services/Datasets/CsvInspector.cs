@@ -2,7 +2,6 @@ namespace HelixReborn.Api.Services.Datasets;
 
 using System.Globalization;
 using CsvHelper;
-using CsvHelper.Configuration;
 using Models;
 
 /// <summary>
@@ -45,29 +44,20 @@ public static class CsvInspector
         $"The file's content type must be one of {string.Join(", ", AllowedContentTypes)}, not '{contentType}'.");
     }
 
-    var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-    {
-      HasHeaderRecord = true,
-      BadDataFound = null,
-      MissingFieldFound = null,
-      HeaderValidated = null,
-    };
+    using var csv = CsvReader.Create(content, CsvReaderOptions.Default, leaveOpen: true);
 
-    using var reader = new StreamReader(content, leaveOpen: true);
-    using var csv = new CsvReader(reader, config);
-
-    string[]? header;
+    IReadOnlyList<string> header;
     try
     {
-      header = csv.Read() && csv.ReadHeader() ? csv.HeaderRecord : null;
+      header = csv.Headers;
     }
-    catch (CsvHelperException ex)
+    catch (FormatException ex)
     {
       problems.Add($"The file couldn't be parsed as CSV: {ex.Message}");
       throw new DatasetValidationException(problems);
     }
 
-    if (header is null)
+    if (header.Count == 0)
     {
       problems.Add("The file has no header row.");
       throw new DatasetValidationException(problems);
@@ -85,11 +75,11 @@ public static class CsvInspector
         rowCount++;
         for (var i = 0; i < columns.Length; i++)
         {
-          columns[i].Add(csv.TryGetField<string?>(i, out var value) ? value : null);
+          columns[i].Add(i < csv.FieldCount ? csv.GetString(i) : null);
         }
       }
     }
-    catch (CsvHelperException ex)
+    catch (FormatException ex)
     {
       problems.Add($"The file couldn't be parsed as CSV: {ex.Message}");
       throw new DatasetValidationException(problems);
