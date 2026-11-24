@@ -134,6 +134,14 @@ public class ArtifactsController(
 
     HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
 
+    // ZipArchiveEntry's compression stream still does a synchronous Write when disposed, even when opened with
+    // OpenAsync; Kestrel (and the test host) disallow synchronous IO on the response body by default.
+    var bodyControl = HttpContext.Features.Get<IHttpBodyControlFeature>();
+    if (bodyControl is not null)
+    {
+      bodyControl.AllowSynchronousIO = true;
+    }
+
     await using (var archive = await ZipArchive.CreateAsync(
       Response.Body,
       ZipArchiveMode.Create,
