@@ -70,10 +70,23 @@ public class DatasetsControllerTests(ApiFactory factory) : IClassFixture<ApiFact
   }
 
   [Fact]
-  public async Task Upload_ReturnsBadRequest_WhenFewerThanTenRows()
+  public async Task Upload_ReturnsCreated_WithOneDataRow()
   {
     var experiment = await CreateExperiment(_user);
-    var csv = Csv(["id", "age"], Enumerable.Range(0, 5).Select(i => new[] { $"{i}", "20" }));
+    var csv = Csv(["id", "age"], [["1", "20"]]);
+
+    var response = await Upload(_user, experiment.Id, csv, "data.csv");
+
+    Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    var dataset = await response.Content.ReadFromJsonAsync<DatasetResponse>();
+    Assert.Equal(1, dataset!.RowCount);
+  }
+
+  [Fact]
+  public async Task Upload_ReturnsBadRequest_WhenHeaderOnly()
+  {
+    var experiment = await CreateExperiment(_user);
+    var csv = Csv(["id", "age"], []);
 
     var response = await Upload(_user, experiment.Id, csv, "data.csv");
 

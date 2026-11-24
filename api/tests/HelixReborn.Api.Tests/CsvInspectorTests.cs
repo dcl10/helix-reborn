@@ -68,6 +68,23 @@ public class CsvInspectorTests
     Assert.Equal(10, result.RowCount);
   }
 
+  [Fact]
+  public void Inspect_AcceptsSingleDataRow()
+  {
+    var result = Inspect(["id", "age"], [["1", "20"]]);
+
+    Assert.Equal(1, result.RowCount);
+    Assert.All(result.Columns, x => Assert.Equal("numeric", x.InferredType));
+  }
+
+  [Fact]
+  public void Inspect_Throws_WhenHeaderOnly()
+  {
+    var ex = Assert.Throws<DatasetValidationException>(() => Inspect(["id", "age"], []));
+
+    Assert.Contains(ex.Problems, x => x.Contains("at least one data row"));
+  }
+
   private static CsvInspectionResult Inspect(string[] header, IEnumerable<string[]> rows)
   {
     var lines = new List<string> { string.Join(",", header) };
