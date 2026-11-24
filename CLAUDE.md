@@ -31,7 +31,7 @@ change, update architecture.md in the same PR.
 Run the checks for every part you touched before committing.
 
 ```bash
-# Local dependencies (Postgres, Keycloak, RabbitMQ, MinIO, MailHog)
+# Local dependencies (Postgres, Keycloak, RabbitMQ, RustFS, MailHog)
 docker compose up -d
 
 # Web
@@ -96,7 +96,7 @@ Follow `.editorconfig` for formatting basics.
 ## Testing
 
 - **Python:** pytest, in each package's `tests/` folder. Name tests `test_<function>_<behaviour>`. Use moto (S3) and
-  fakes; tests never call real external services. Tests that need RabbitMQ, MinIO or Keycloak are marked
+  fakes; tests never call real external services. Tests that need RabbitMQ, RustFS or Keycloak are marked
   `@pytest.mark.integration` and skipped unless `HELIX_INTEGRATION=1`.
 - **API:** xUnit in `api/tests/HelixReborn.Api.Tests/`. Name tests `MethodName_ExpectedBehaviour_Condition`. Use
   `WebApplicationFactory` integration tests on a real Postgres (from `docker compose`), with a test auth scheme
