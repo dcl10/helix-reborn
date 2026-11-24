@@ -16,17 +16,22 @@ api/
     Program.cs                   composition root
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
-    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions)
+    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options)
     Controllers/                 one per resource, thin
+    Filters/                     MVC filters (RejectOversizedUploadAttribute)
     Models/                      request/response types
     Data/                        AppDbContext, design-time factory, migrations
     Health/                      /health response writer
     Services/
+      Experiments/               IExperimentService, ExperimentService, ExperimentNotFoundException
+      Datasets/                  IDatasetService, DatasetService, CsvInspector and their exceptions
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
       Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
+      Storage/                   IObjectStorage, S3ObjectStorage, StorageKeys
     Extensions/                  service registration extensions used by Program.cs
   tests/HelixReborn.Api.Tests/
-    Fixtures/                    ApiFactory, test auth handler, test-only admin controller, InMemoryKeycloakUserAdmin
+    Fixtures/                    ApiFactory, test auth handler, test-only admin controller, InMemoryKeycloakUserAdmin,
+                                 InMemoryObjectStorage
 ```
 
 ## Configuration
@@ -46,6 +51,9 @@ first use.
   link.
 - **`Helix`** (`HelixOptions`) — `Version`, reported by `/health` so the deploy workflow can confirm a rollout
   reached the expected image. Set from the image's `HELIX_VERSION` build arg; `"dev"` otherwise.
+- **`S3`** (`S3Options`) — `ServiceUrl` (default `http://localhost:9000`, the local MinIO), `Region` (`us-east-1`),
+  `Bucket` (`helix`), `ForcePathStyle` (`true`, which MinIO needs), `AccessKey` and `SecretKey`. The credentials are
+  only in `appsettings.Development.json`; set them through the environment everywhere else.
 
 ## Auth
 
@@ -87,6 +95,51 @@ flow and `Keycloak:Secret`'s source.
 Tests fake `IKeycloakUserAdmin` with `InMemoryKeycloakUserAdmin` (`tests/.../Fixtures/`), which `ApiFactory` registers
 in place of `KeycloakUserAdmin`, so the test suite never calls a real Keycloak.
 
+## Experiments and datasets
+
+An experiment is the top-level thing a user works in. It holds one uploaded CSV dataset, and later its EDA
+artifacts, pipelines, runs, evaluations and predictions. Every route needs a signed-in user. Users see only their own
+experiments. `helix-admin` can read anyone's but can't change them: an admin's `PATCH`/`DELETE` on someone else's
+experiment gets a `404`, the same as a missing one.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `GET` | `/api/experiments` | The caller's experiments, newest first. Admins add `?all=true` to list every user's. |
+| `POST` | `/api/experiments` | Creates one (`name` 1–100 characters, `description` up to 1000). `201` with `Location`. |
+| `GET` | `/api/experiments/{id}` | One experiment, with its dataset if it has one. `404` if missing or not visible. |
+| `PATCH` | `/api/experiments/{id}` | Updates `name` and/or `description`; a field left out (or `null`) is unchanged. Owner only. |
+| `DELETE` | `/api/experiments/{id}` | Deletes the DB rows and every stored object under the experiment's prefix. `204`. Owner only. |
+| `POST` | `/api/experiments/{id}/dataset` | Uploads the dataset (`multipart/form-data`, field `file`). Owner only. |
+| `GET` | `/api/experiments/{id}/dataset` | The dataset's details and inferred columns, or `404`. |
+
+Upload rules, checked by `CsvInspector` (CsvHelper, invariant culture):
+
+- `.csv` extension and a content type of `text/csv`, `application/vnd.ms-excel` or `application/octet-stream`.
+- A header row of 2–1000 unique, non-empty column names, and at least 10 data rows.
+- 50 MB at most, otherwise `413`. One dataset per experiment, otherwise `409`. Other failures are a `400`
+  `ValidationProblemDetails` listing every problem under `file`.
+
+Each column gets a `missingCount` (blank values) and an `inferredType`: `empty` if every value is blank, `numeric` if
+every non-blank value parses as a `double`, `text` otherwise. The column list is stored as `jsonb` on the `Datasets`
+row.
+
+The upload is streamed once to a temp file, inspected, then uploaded from the temp file, so a 50 MB file is never held
+in memory. `[RequestSizeLimit]` and `[RequestFormLimits]` set the 50 MB limit, but on their own a too-large body comes
+back as a model-binding `400`. `RejectOversizedUploadAttribute` (`Filters/`) runs before model binding and returns
+the `413` instead.
+
+Objects follow the storage layout in [architecture.md](architecture.md#storage-layout-s3), built by `StorageKeys`
+with lowercase hyphenated IDs:
+
+```
+experiments/{experimentId}/                                 StorageKeys.Experiment: everything for one experiment
+experiments/{experimentId}/datasets/{datasetId}/{fileName}  StorageKeys.Dataset: the uploaded CSV
+```
+
+The client's file name is never trusted in a key: anything outside `[A-Za-z0-9._-]` becomes `_`, and it's cut to 100
+characters. `IObjectStorage` (`Services/Storage/`) is the only way the API touches S3; `S3ObjectStorage` implements it
+with `AmazonS3Client`, and `DeletePrefixAsync` deletes in batches of up to 1000 keys.
+
 ## Running it
 
 ```bash
@@ -100,8 +153,8 @@ AirPlay. `GET /api/me` is a quick way to check a token is accepted; `GET /health
 
 ## Migrations
 
-The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table; further
-domain entities are added by later issues.
+The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table and
+`AddExperiments` the `Experiments` and `Datasets` tables; further domain entities are added by later issues.
 
 ```bash
 cd api
@@ -123,6 +176,8 @@ isolated and can run in parallel.
 - There's no Keycloak in tests: `TestAuthHandler` reads claims from an `X-Test-Claims` header instead of validating a
   JWT. `ApiFactory.CreateAnonymousClient()`, `CreateUserClient(...)` and `CreateAdminClient()` build clients with the
   right header set.
+- `ApiFactory` replaces `IObjectStorage` with `InMemoryObjectStorage`, a dictionary keyed by object key, so tests
+  never need MinIO.
 - `TestAdminController` (test assembly only) exercises the `AdminOnly` policy before the app has a real admin
   endpoint.
 
