@@ -17,7 +17,7 @@ public static class CsvInspector
   public const int MaxColumns = 1000;
 
   /// <summary>Minimum number of data rows (excluding the header) allowed.</summary>
-  public const int MinDataRows = 10;
+  public const int MinDataRows = 1;
 
   /// <summary>Content types accepted for an upload, alongside its <c>.csv</c> extension.</summary>
   public static readonly IReadOnlyList<string> AllowedContentTypes =
@@ -87,7 +87,7 @@ public static class CsvInspector
 
     if (rowCount < MinDataRows)
     {
-      problems.Add($"The file must have at least {MinDataRows} data rows; it has {rowCount}.");
+      problems.Add("The file must have at least one data row below the header.");
     }
 
     if (problems.Count > 0)
