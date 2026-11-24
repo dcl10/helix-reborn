@@ -74,7 +74,7 @@ pytest, in each package's `tests/` folder, run with `--import-mode=importlib` so
 folder without name clashes. Name tests `test_<function>_<behaviour>`. Use moto (S3) and fakes; tests never call
 real external services.
 
-Tests that need RabbitMQ, MinIO or Keycloak are marked `@pytest.mark.integration` and are skipped unless
+Tests that need RabbitMQ, RustFS or Keycloak are marked `@pytest.mark.integration` and are skipped unless
 `HELIX_INTEGRATION=1` is set in the environment.
 
 ## Settings and storage
@@ -101,7 +101,7 @@ reads `os.environ` directly. Call `helix_core.settings.get_settings()` to get th
 actually needed (building a client), never in logs or `repr`.
 
 `helix_core.storage.Storage` wraps a boto3 S3 client bound to one bucket (`Storage.from_settings()` builds one from
-`HelixSettings`, with path-style addressing, which MinIO/RustFS needs). It offers `get_bytes`/`put_bytes`,
+`HelixSettings`, with path-style addressing, which RustFS needs). It offers `get_bytes`/`put_bytes`,
 `get_json`/`put_json`, `exists`, and `download_file`/`upload_file`; a missing or unreadable object raises
 `helix_core.errors.StorageError`. `helix_core.storage.join_key` joins S3 key segments with single slashes.
 
