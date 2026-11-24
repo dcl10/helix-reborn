@@ -115,7 +115,7 @@ experiment gets a `404`, the same as a missing one.
 Upload rules, checked by `CsvInspector` (CsvHelper, invariant culture):
 
 - `.csv` extension and a content type of `text/csv`, `application/vnd.ms-excel` or `application/octet-stream`.
-- A header row of 2–1000 unique, non-empty column names, and at least 10 data rows.
+- A header row of 2–1000 unique, non-empty column names, and at least one data row.
 - 50 MB at most, otherwise `413`. One dataset per experiment, otherwise `409`. Other failures are a `400`
   `ValidationProblemDetails` listing every problem under `file`.
 
