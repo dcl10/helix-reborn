@@ -94,9 +94,8 @@ public class DatasetsControllerTests(ApiFactory factory) : IClassFixture<ApiFact
     content.Add(fileContent, "file", "huge.csv");
 
     var response = await _user.PostAsync($"{ExperimentsRoute}/{experiment.Id}/dataset", content);
-    var body = await response.Content.ReadAsStringAsync();
 
-    throw new Exception($"{response.StatusCode}:{body}");
+    Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
   }
 
   [Fact]
