@@ -13,6 +13,10 @@ builder.Services.AddKeycloakAuth(builder.Environment);
 // Invitations, sent through the Keycloak admin API as the helix-api service account.
 builder.Services.AddInvitations(builder.Configuration);
 
+// Experiments, datasets and the S3-compatible object store they're uploaded to.
+builder.Services.AddObjectStorage();
+builder.Services.AddExperiments();
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

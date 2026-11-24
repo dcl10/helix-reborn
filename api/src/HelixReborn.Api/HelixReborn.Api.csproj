@@ -23,6 +23,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Npgsql only requires an older Relational; reference it so it matches the other EF Core packages -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <!-- Experiments and datasets (#13): object storage and CSV parsing -->
+    <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="CsvHelper" />
   </ItemGroup>
 
 </Project>

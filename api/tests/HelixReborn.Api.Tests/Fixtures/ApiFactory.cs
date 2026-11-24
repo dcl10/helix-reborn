@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Services.Keycloak;
+using Services.Storage;
 
 /// <summary>
 /// Test host for integration tests. Each factory gets its own Postgres database, <c>helix_test_&lt;guid&gt;</c>, on
@@ -35,6 +36,9 @@ public class ApiFactory : WebApplicationFactory<Program>
 
   /// <summary>The fake Keycloak admin API the app uses, shared by every request to this factory's host.</summary>
   public InMemoryKeycloakUserAdmin Keycloak { get; } = new();
+
+  /// <summary>The fake object store the app uses, shared by every request to this factory's host.</summary>
+  public InMemoryObjectStorage ObjectStorage { get; } = new();
 
   private readonly string _serverConnection;
   private readonly string _databaseName = $"helix_test_{Guid.NewGuid():N}";
@@ -71,6 +75,10 @@ public class ApiFactory : WebApplicationFactory<Program>
       // Tests never call Keycloak's admin API.
       services.RemoveAll<IKeycloakUserAdmin>();
       services.AddSingleton<IKeycloakUserAdmin>(Keycloak);
+
+      // Tests never call a real S3-compatible store.
+      services.RemoveAll<IObjectStorage>();
+      services.AddSingleton<IObjectStorage>(ObjectStorage);
     });
 
     builder.ConfigureServices(services =>

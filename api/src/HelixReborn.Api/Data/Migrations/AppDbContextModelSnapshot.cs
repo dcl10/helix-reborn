@@ -22,6 +22,77 @@ namespace HelixReborn.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HelixReborn.Api.Models.Dataset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Columns")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExperimentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("RowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExperimentId")
+                        .IsUnique();
+
+                    b.ToTable("Datasets");
+                });
+
+            modelBuilder.Entity("HelixReborn.Api.Models.Experiment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OwnerSub")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerSub");
+
+                    b.ToTable("Experiments");
+                });
+
             modelBuilder.Entity("HelixReborn.Api.Models.Invitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -60,6 +131,20 @@ namespace HelixReborn.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Invitations");
+                });
+
+            modelBuilder.Entity("HelixReborn.Api.Models.Dataset", b =>
+                {
+                    b.HasOne("HelixReborn.Api.Models.Experiment", null)
+                        .WithOne("Dataset")
+                        .HasForeignKey("HelixReborn.Api.Models.Dataset", "ExperimentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HelixReborn.Api.Models.Experiment", b =>
+                {
+                    b.Navigation("Dataset");
                 });
 #pragma warning restore 612, 618
         }
