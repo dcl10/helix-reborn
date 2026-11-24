@@ -34,4 +34,4 @@ known-first-party = ["helix_core", "helix_eda", "helix_training", "helix_evaluat
 addopts = "--import-mode=importlib -ra"
 testpaths = ["packages"]
 asyncio_mode = "auto"
-markers = ["integration: needs real RabbitMQ/MinIO/Keycloak; runs only when HELIX_INTEGRATION=1"]
+markers = ["integration: needs real RabbitMQ/RustFS/Keycloak; runs only when HELIX_INTEGRATION=1"]

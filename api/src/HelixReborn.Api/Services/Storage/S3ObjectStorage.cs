@@ -5,7 +5,7 @@ using Amazon.S3.Model;
 using Config;
 using Microsoft.Extensions.Options;
 
-/// <summary><see cref="IObjectStorage"/> on an S3-compatible bucket (MinIO/RustFS locally, DO Spaces in production).</summary>
+/// <summary><see cref="IObjectStorage"/> on an S3-compatible bucket (RustFS locally, DO Spaces in production).</summary>
 /// <param name="client">The S3 client, configured for <see cref="S3Options"/>.</param>
 /// <param name="options">The bucket to use.</param>
 public class S3ObjectStorage(IAmazonS3 client, IOptions<S3Options> options) : IObjectStorage

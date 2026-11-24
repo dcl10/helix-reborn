@@ -2,7 +2,7 @@
 
 One bucket holds datasets, plots, tables and models, as laid out in
 ``docs/architecture.md`` ("Storage layout (S3)"). Locally this bucket is served by
-RustFS/MinIO; in production it is DigitalOcean Spaces.
+RustFS; in production it is DigitalOcean Spaces.
 """
 
 import json
@@ -54,7 +54,7 @@ class Storage:
     def from_settings(cls, settings: HelixSettings) -> "Storage":
         """Build a :class:`Storage` bound to the bucket from ``settings``.
 
-        Uses path-style addressing, which MinIO/RustFS requires (virtual-hosted-style
+        Uses path-style addressing, which RustFS requires (virtual-hosted-style
         addressing would otherwise resolve to ``<bucket>.localhost``).
 
         Args:

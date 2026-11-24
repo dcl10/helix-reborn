@@ -10,7 +10,7 @@ public static class StorageServiceCollectionExtensions
 {
   /// <summary>
   /// Registers <see cref="S3Options"/> and an <see cref="IObjectStorage"/> backed by an <see cref="IAmazonS3"/>
-  /// client pointed at that bucket (MinIO/RustFS locally, DO Spaces in production; <see cref="S3Options.ForcePathStyle"/>
+  /// client pointed at that bucket (RustFS locally, DO Spaces in production; <see cref="S3Options.ForcePathStyle"/>
   /// is required for the former).
   /// </summary>
   /// <param name="services">The service collection.</param>
