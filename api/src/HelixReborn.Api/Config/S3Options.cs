@@ -2,7 +2,7 @@ namespace HelixReborn.Api.Config;
 
 using System.ComponentModel.DataAnnotations;
 
-/// <summary>Where the API finds the S3-compatible object store (MinIO locally, DO Spaces in production).</summary>
+/// <summary>Where the API finds the S3-compatible object store (RustFS locally, DO Spaces in production).</summary>
 public class S3Options
 {
   /// <summary>Configuration section these options bind to.</summary>
@@ -30,7 +30,7 @@ public class S3Options
 
   /// <summary>
   /// Whether to address the bucket as a path (<c>http://host/bucket/key</c>) rather than a subdomain. Required for
-  /// MinIO/RustFS; DO Spaces supports either.
+  /// RustFS; DO Spaces supports either.
   /// </summary>
   public bool ForcePathStyle { get; init; } = true;
 }

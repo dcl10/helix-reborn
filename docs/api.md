@@ -51,8 +51,8 @@ first use.
   link.
 - **`Helix`** (`HelixOptions`) — `Version`, reported by `/health` so the deploy workflow can confirm a rollout
   reached the expected image. Set from the image's `HELIX_VERSION` build arg; `"dev"` otherwise.
-- **`S3`** (`S3Options`) — `ServiceUrl` (default `http://localhost:9000`, the local MinIO), `Region` (`us-east-1`),
-  `Bucket` (`helix`), `ForcePathStyle` (`true`, which MinIO needs), `AccessKey` and `SecretKey`. The credentials are
+- **`S3`** (`S3Options`) — `ServiceUrl` (default `http://localhost:9000`, the local RustFS), `Region` (`us-east-1`),
+  `Bucket` (`helix`), `ForcePathStyle` (`true`, which RustFS needs), `AccessKey` and `SecretKey`. The credentials are
   only in `appsettings.Development.json`; set them through the environment everywhere else.
 
 ## Auth
@@ -177,7 +177,7 @@ isolated and can run in parallel.
   JWT. `ApiFactory.CreateAnonymousClient()`, `CreateUserClient(...)` and `CreateAdminClient()` build clients with the
   right header set.
 - `ApiFactory` replaces `IObjectStorage` with `InMemoryObjectStorage`, a dictionary keyed by object key, so tests
-  never need MinIO.
+  never need RustFS.
 - `TestAdminController` (test assembly only) exercises the `AdminOnly` policy before the app has a real admin
   endpoint.
 

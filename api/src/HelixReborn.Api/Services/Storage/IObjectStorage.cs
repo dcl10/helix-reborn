@@ -1,7 +1,7 @@
 namespace HelixReborn.Api.Services.Storage;
 
 /// <summary>
-/// The S3-compatible object store (MinIO/RustFS locally, DO Spaces in production). Behind an interface so tests can
+/// The S3-compatible object store (RustFS locally, DO Spaces in production). Behind an interface so tests can
 /// use an in-memory fake.
 /// </summary>
 public interface IObjectStorage

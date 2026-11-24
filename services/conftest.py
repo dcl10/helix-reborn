@@ -1,7 +1,7 @@
 """Shared pytest configuration for the whole uv workspace.
 
 Skips ``@pytest.mark.integration`` tests unless ``HELIX_INTEGRATION=1`` is set, per
-``CLAUDE.md`` and ``docs/architecture.md``: those tests need a real RabbitMQ, MinIO or
+``CLAUDE.md`` and ``docs/architecture.md``: those tests need a real RabbitMQ, RustFS or
 Keycloak and must not run by default.
 """
 
