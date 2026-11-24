@@ -19,6 +19,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   /// <summary>Uploaded datasets, one per experiment.</summary>
   public DbSet<Dataset> Datasets => Set<Dataset>();
 
+  /// <summary>Files registered against an experiment: datasets, EDA, models, evaluations, predictions.</summary>
+  public DbSet<Artifact> Artifacts => Set<Artifact>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
