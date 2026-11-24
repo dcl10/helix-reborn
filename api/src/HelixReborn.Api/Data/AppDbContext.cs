@@ -67,5 +67,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
       dataset.HasIndex(x => x.ExperimentId).IsUnique();
     });
+
+    modelBuilder.Entity<Artifact>(artifact =>
+    {
+      artifact.Property(x => x.Kind).HasConversion<string>();
+      artifact.Property(x => x.StorageKey).IsRequired();
+
+      artifact.HasIndex(x => x.StorageKey).IsUnique();
+      artifact.HasIndex(x => x.ExperimentId);
+      artifact.HasIndex(x => x.SourceId);
+
+      artifact.HasOne<Experiment>()
+        .WithMany()
+        .HasForeignKey(x => x.ExperimentId)
+        .OnDelete(DeleteBehavior.Cascade);
+    });
   }
 }
