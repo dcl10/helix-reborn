@@ -1,6 +1,7 @@
 namespace HelixReborn.Api.Controllers;
 
 using Auth;
+using Filters;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Services.Datasets;
@@ -36,6 +37,7 @@ public class DatasetsController(IDatasetService datasets, ICurrentUser currentUs
   [HttpPost]
   [RequestSizeLimit(MaxUploadBytes)]
   [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadBytes)]
+  [RejectOversizedUpload(MaxUploadBytes)]
   public async Task<ActionResult<DatasetResponse>> Upload(
     Guid experimentId,
     IFormFile file,
