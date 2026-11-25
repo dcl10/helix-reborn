@@ -140,6 +140,39 @@ The client's file name is never trusted in a key: anything outside `[A-Za-z0-9._
 characters. `IObjectStorage` (`Services/Storage/`) is the only way the API touches S3; `S3ObjectStorage` implements it
 with `AmazonS3Client`, and `DeletePrefixAsync` deletes in batches of up to 1000 keys.
 
+## Artifacts
+
+An artifact is a record of one file an experiment owns: the dataset, EDA plots and tables, a run's model and
+metadata, evaluation plots and tables, or predictions. `IArtifactService` (`Services/Artifacts/`) is the only way
+other services register a file they've already uploaded to S3 — `DatasetService` calls `RecordAsync` right after it
+uploads the dataset, and later issues (EDA, training, evaluation, prediction) do the same for their own output.
+`ArtifactsController` only reads; artifacts are never created or deleted through the API itself. Same ownership
+rules as experiments: owner, or `helix-admin` read-only.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `GET` | `/api/experiments/{id}/artifacts?sourceType=&sourceId=` | The experiment's artifacts, oldest first. Both query params are optional and combine with AND. |
+| `GET` | `/api/experiments/{id}/artifacts/{artifactId}/content` | Streams the file with its stored `Content-Type`. `?download=true` adds `Content-Disposition: attachment` with the storage key's last segment as the file name; otherwise `inline`. `404` if the artifact record or its S3 object is missing. |
+| `GET` | `/api/experiments/{id}/archive` | `application/zip` streamed straight to the response, one entry per artifact, named by the storage key with the `experiments/{id}/` prefix stripped off. `Content-Disposition: attachment` with a sanitised `<experiment name>-<id8>.zip` file name. |
+
+An `ArtifactResponse`:
+
+```json
+{ "id": "…", "kind": "evaluationPlot", "title": "ROC curve", "contentType": "image/png", "sizeBytes": 48211,
+  "sourceType": "evaluation", "sourceId": "…", "createdAt": "…", "fileName": "roc_curve.png" }
+```
+
+`kind` is one of `dataset`, `edaPlot`, `edaTable`, `model`, `modelMetadata`, `split`, `cvMetrics`, `metrics`,
+`evaluationPlot`, `evaluationTable`, `predictions` — the `ArtifactKind` enum, serialized camelCase. `sourceType` is
+`"dataset"`, `"eda"`, `"run"`, `"evaluation"` or `"prediction"`, and `sourceId` the ID of that dataset, run,
+evaluation or prediction; both are null for artifacts that aren't tied to one of those (there are none yet, since
+this issue only records the dataset).
+
+Both streaming endpoints write straight to `Response.Body`: `/content` copies the S3 object's stream across, and
+`/archive` writes a `ZipArchive` (mode `Create`) over it, response buffering disabled, so neither holds a whole file
+in memory. `ZipArchiveEntry` still does a synchronous `Write` on dispose even when opened with `OpenAsync`, so the
+archive endpoint turns on `IHttpBodyControlFeature.AllowSynchronousIO` for itself rather than globally.
+
 ## Running it
 
 ```bash
