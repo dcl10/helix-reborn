@@ -21,7 +21,7 @@ export default function ExperimentPage({
 
 async function RedirectToData({
   params,
-}: Pick<PageProps<"/experiments/[id]">, "params">) {
+}: Pick<PageProps<"/experiments/[id]">, "params">): Promise<never> {
   const { id } = await params;
   redirect(experimentPath(id, "data"));
 }

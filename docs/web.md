@@ -1,7 +1,7 @@
 # Web app
 
-The Next.js frontend in `web/`: a public landing page, sign-in, the signed-in app shell and the admin Users page.
-Experiments pages (#15) land in a later issue; `/experiments` is a placeholder for now.
+The Next.js frontend in `web/`: a public landing page, sign-in, the signed-in app shell, experiments and the admin
+Users page.
 
 ## Running it
 
@@ -37,7 +37,10 @@ web/
 │   ├── sign-in/page.tsx        # public sign-in page
 │   ├── (app)/                  # signed-in pages, inside <AppShell>
 │   │   ├── layout.tsx
-│   │   ├── experiments/page.tsx # placeholder: "Experiments" / "Coming soon" (#15 builds it out)
+│   │   ├── experiments/page.tsx # list + "New experiment" dialog
+│   │   ├── experiments/[id]/   # layout.tsx: header, edit/delete, tabs; page.tsx redirects to ./data (#38
+│   │   │                       # replaces it with an overview); data/, eda/, pipelines/, runs/,
+│   │   │                       # evaluations/, predict/, files/ page.tsx, the last six placeholders
 │   │   └── admin/users/page.tsx # admin-only Users page: invite, resend, revoke
 │   └── api/
 │       ├── auth/[...nextauth]/ # Auth.js endpoints; /session is cut down so tokens never reach the browser
