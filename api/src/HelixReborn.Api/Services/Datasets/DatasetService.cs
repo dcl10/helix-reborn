@@ -1,5 +1,6 @@
 namespace HelixReborn.Api.Services.Datasets;
 
+using Artifacts;
 using Data;
 using Experiments;
 using Microsoft.EntityFrameworkCore;
@@ -9,8 +10,10 @@ using Storage;
 /// <summary><see cref="IDatasetService"/> on the app database and object storage.</summary>
 /// <param name="db">The app database.</param>
 /// <param name="storage">Object storage, to upload the validated file.</param>
+/// <param name="artifacts">Records the uploaded dataset as an artifact.</param>
 /// <param name="time">The clock.</param>
-public class DatasetService(AppDbContext db, IObjectStorage storage, TimeProvider time) : IDatasetService
+public class DatasetService(AppDbContext db, IObjectStorage storage, IArtifactService artifacts, TimeProvider time)
+  : IDatasetService
 {
   /// <summary>Characters allowed in a stored file name; anything else is replaced with <c>_</c>.</summary>
   private const int MaxFileNameLength = 100;
@@ -90,6 +93,17 @@ public class DatasetService(AppDbContext db, IObjectStorage storage, TimeProvide
 
     db.Datasets.Add(dataset);
     await db.SaveChangesAsync(cancellationToken);
+
+    await artifacts.RecordAsync(
+      experimentId,
+      ArtifactKind.Dataset,
+      $"Dataset: {sanitisedFileName}",
+      storageKey,
+      "text/csv",
+      sizeBytes,
+      "dataset",
+      datasetId,
+      cancellationToken);
 
     return ToResponse(dataset);
   }

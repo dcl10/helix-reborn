@@ -19,6 +19,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   /// <summary>Uploaded datasets, one per experiment.</summary>
   public DbSet<Dataset> Datasets => Set<Dataset>();
 
+  /// <summary>Files registered against an experiment: datasets, EDA, models, evaluations, predictions.</summary>
+  public DbSet<Artifact> Artifacts => Set<Artifact>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -63,6 +66,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
           v => v.ToList()));
 
       dataset.HasIndex(x => x.ExperimentId).IsUnique();
+    });
+
+    modelBuilder.Entity<Artifact>(artifact =>
+    {
+      artifact.Property(x => x.Kind).HasConversion<string>();
+      artifact.Property(x => x.StorageKey).IsRequired();
+
+      artifact.HasIndex(x => x.StorageKey).IsUnique();
+      artifact.HasIndex(x => x.ExperimentId);
+      artifact.HasIndex(x => x.SourceId);
+
+      artifact.HasOne<Experiment>()
+        .WithMany()
+        .HasForeignKey(x => x.ExperimentId)
+        .OnDelete(DeleteBehavior.Cascade);
     });
   }
 }
