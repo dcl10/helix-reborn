@@ -184,7 +184,7 @@ public class ArtifactsControllerTests(ApiFactory factory) : IClassFixture<ApiFac
     return (await response.Content.ReadFromJsonAsync<DatasetResponse>())!;
   }
 
-  private async Task<ArtifactResponse> SingleArtifact(HttpClient client, Guid experimentId)
+  private static async Task<ArtifactResponse> SingleArtifact(HttpClient client, Guid experimentId)
   {
     var artifacts = await client.GetFromJsonAsync<List<ArtifactResponse>>($"{ExperimentsRoute}/{experimentId}/artifacts");
     return Assert.Single(artifacts!);
