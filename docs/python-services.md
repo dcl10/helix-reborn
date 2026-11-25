@@ -17,12 +17,15 @@ services/
       pyproject.toml
       src/helix_core/
       tests/
-  eda/                          FastAPI service (added by #16)
+  eda/                          FastAPI service (package helix-eda)
+    pyproject.toml
+    src/helix_eda/
+    tests/
   training/                     aio-pika worker (added by #23)
   evaluation/                   aio-pika worker (added by #28)
 ```
 
-Each of `eda`, `training` and `evaluation` is added to `[tool.uv.workspace].members` and `[tool.pytest.ini_options].testpaths`
+Each of `training` and `evaluation` is added to `[tool.uv.workspace].members` and `[tool.pytest.ini_options].testpaths`
 by the issue that creates it.
 
 ### helix-core vs a service
@@ -110,3 +113,66 @@ actually needed (building a client), never in logs or `repr`.
 `helix_core.errors.InvalidDataError` if it's empty or unreadable), `select_features_target` splits a dataframe into
 features/target/IDs after checking the named columns exist, the features are numeric, and the target/ID columns
 aren't also features, and `numeric_columns` lists a dataframe's numeric columns.
+
+`helix_core.auth.JwtValidator` validates a Keycloak access token: RS256 signature against the realm's JWKS, issuer,
+audience and expiry (30 seconds of leeway), raising `helix_core.auth.TokenValidationError` — never with the token in
+the message — on any failure. It fetches signing keys with `jwt.PyJWKClient` (cached, 5-minute lifespan); tests inject
+a fake JWKS client instead of serving real keys over HTTP.
+
+## EDA service
+
+`services/eda/` (package `helix-eda`, import `helix_eda`) is a synchronous FastAPI service for dataset summaries and
+plots. Only the API calls it, server-to-server, with a Keycloak client-credentials token from the `helix-api` service
+account (`aud: helix-eda`); see [architecture.md](architecture.md#auth). It never touches Postgres and never calls
+Keycloak itself — it only validates tokens the API already obtained.
+
+**Endpoints**
+
+| Method & path | Auth | Body | Returns |
+| --- | --- | --- | --- |
+| `GET /health` | none | — | `{"status": "ok", "version": "…"}` |
+| `POST /summary` | service token | `{"dataset_key": "…"}` | row/column counts and per-column summary statistics |
+
+Every route but `/health` sits behind `helix_eda.dependencies.require_service_token`, which expects an
+`Authorization: Bearer <token>` header and validates it with `helix_core.auth.JwtValidator` (built from
+`HELIX_KEYCLOAK_ISSUER`, `HELIX_KEYCLOAK_JWKS_URL`/derived, and `HELIX_EDA_AUDIENCE`, see the settings table above). A
+missing header, a malformed header, or a token that fails validation all get `401` with a `WWW-Authenticate: Bearer`
+header. `helix_eda.dependencies.get_storage` builds the S3 client the same way the other services do; both it and the
+validator dependency are `app.dependency_overrides` targets for tests.
+
+`helix_eda.summary.summarise` computes per-column statistics with pandas: numeric columns get
+mean/std/min/quartiles/max (rounded to 6 significant digits, `null` where a statistic can't be computed, e.g. an
+all-missing column); non-numeric columns get the 10 most common values and their counts instead. The route loads the
+dataset with `helix_core.datasets.load_csv`, which raises `InvalidDataError` (→ `422`) for an unreadable or empty CSV
+and whose underlying `StorageError` (→ `404`) is raised when the key doesn't exist.
+
+**Running it locally**
+
+```bash
+cd services
+uv run helix-eda            # or: uv run python -m helix_eda
+```
+
+Starts on `0.0.0.0:8000` (published on host port `8001`, see [architecture.md](architecture.md#local-ports)).
+`docker compose up -d` must be running first so RustFS and Keycloak are available.
+
+**Getting a token for manual testing.** Use the `helix-api` client's credentials against Keycloak (client secret from
+the admin console, see [auth-setup.md](auth-setup.md#client-secrets)):
+
+```bash
+curl -s -X POST http://localhost:8080/realms/helix/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=client_credentials' \
+  -d 'client_id=helix-api' \
+  -d 'client_secret=<helix-api client secret>' \
+  | jq -r .access_token
+```
+
+Then call the service:
+
+```bash
+curl -s http://localhost:8001/summary \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"dataset_key": "experiments/.../datasets/.../data.csv"}'
+```
