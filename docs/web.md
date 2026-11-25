@@ -105,6 +105,45 @@ For code in `web/`:
   `MainNav` / `MainNavLinks`, or the build fails.
 - **Sign in and out:** `signInWithKeycloak` and `signOutEverywhere` in `lib/auth/actions.ts` are server actions.
 
+## Experiments
+
+`/experiments` lists the caller's experiments and lets them create one; each experiment then lives at
+`/experiments/[id]` with a tab layout. It calls the API's experiment and dataset endpoints (see
+[api.md](api.md#experiments-and-datasets)) through `/api/proxy/experiments…`.
+
+- **`app/(app)/experiments/page.tsx`** renders the list (`ExperimentsTable`) and a "New experiment" button
+  (`NewExperimentDialog`); creating one navigates to its Data tab.
+- **`app/(app)/experiments/[id]/layout.tsx`** awaits `params` behind a `<Suspense>` boundary and renders
+  `ExperimentHeader`, above `children` (the active tab).
+- **`app/(app)/experiments/[id]/page.tsx`** redirects to the Data tab; #38 replaces this with an overview.
+- **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`. The other six tab pages
+  (`eda`, `pipelines`, `runs`, `evaluations`, `predict`, `files`) are "Coming soon" placeholders until
+  their own issues (#20, #26, #26, #35, #37, #38) build them out.
+- **`components/experiments/experiment-header.tsx`** (`ExperimentHeader`) shows the experiment's name and
+  description, `EditExperimentDialog` (PATCH) and `DeleteExperimentButton` (an `AlertDialog` confirm, then
+  DELETE and navigate back to `/experiments`), and the tab navigation below them.
+- **`components/experiments/experiment-tabs.tsx`** (`ExperimentTabs` / `ExperimentTabLinks`) links to each
+  tab (Data, EDA, Pipelines, Runs, Evaluations, Predict, Files) and highlights the one `pathname` starts
+  with. `ExperimentTabs` reads `usePathname()`, so it suspends on this dynamic route: render it inside a
+  `<Suspense>` boundary whose fallback is `ExperimentTabLinks` with no `pathname`, as `main-nav.tsx` does
+  for the main nav.
+- **`components/experiments/dataset-overview.tsx`** (`DatasetOverview`) is the Data tab: `DatasetUpload`
+  when the experiment has no dataset yet, or a summary (file name, size, rows, columns) and
+  `DatasetColumnsTable` (name, a type badge, missing count) once it does.
+- **`components/experiments/dataset-upload.tsx`** (`DatasetUpload`) is a drop zone plus file input
+  accepting `.csv`, rejecting anything over 50 MB client-side before it ever reaches the API's own limit.
+  While uploading it disables the button and shows "Uploading…"; the API's error message (409 already has
+  a dataset, 400 invalid CSV, 413 too large) surfaces as-is.
+- **`components/experiments/use-experiments.ts`** wraps `lib/experiments.ts` in TanStack Query:
+  `useExperiments` / `useExperiment` / `useDataset` to read, and mutations for create, update, delete and
+  dataset upload, each invalidating the relevant query key on success.
+- **`lib/experiments.ts`** has the `Experiment`, `Dataset` and `DatasetColumn` types, `experimentSchema`,
+  `experimentPath`, `MAX_DATASET_BYTES`, and the calls to `/api/proxy/experiments…`, including
+  `uploadDataset`, which sends `FormData` (no `Content-Type`; the browser adds the boundary).
+
+Dataset uploads go through `proxy.ts`, which otherwise buffers request bodies to Next's ~10 MB default;
+`next.config.ts` raises this to 50 MB with `experimental.proxyClientMaxBodySize`.
+
 ## Admin: users
 
 `/admin/users` (linked from the main nav for admins only) lets `helix-admin` users invite colleagues by email, and
