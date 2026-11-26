@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
+import { RunPipelineButton } from "@/components/pipelines/run-pipeline-button";
 import {
   useDeletePipeline,
   usePipelineCatalog,
@@ -89,7 +90,7 @@ function DeletePipelineButton({
 
 /**
  * The Pipelines tab's list: each saved pipeline's name, model, feature count and last update, with edit and delete,
- * and a "New pipeline" button. A run button comes with the Runs tab (#27).
+ * and a "New pipeline" button. The Run button starts a run and opens it.
  * @param experimentId - the experiment
  * @returns the list
  */
@@ -168,7 +169,12 @@ export function PipelinesList({ experimentId }: { experimentId: string }) {
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
-                    {/* The Run button goes here (#27). */}
+                    <RunPipelineButton
+                      experimentId={experimentId}
+                      pipelineId={pipeline.id}
+                      pipelineName={pipeline.name}
+                      iconOnly
+                    />
                     <Link
                       href={`${base}/${pipeline.id}`}
                       className={buttonVariants({
