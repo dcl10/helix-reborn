@@ -74,6 +74,83 @@ class PairplotRequest(PlotRequest):
     diag_kind: Literal["hist", "kde"] = Field("hist", description="Diagonal plot kind.")
 
 
+class DimensionalityReductionRequest(PlotRequest):
+    """Fields shared by the PCA and t-SNE request bodies."""
+
+    columns: list[str] | None = Field(
+        None,
+        description="Numeric columns to reduce. Defaults to all numeric columns.",
+    )
+    colour_column: str | None = Field(None, description="Column to colour points by.")
+    scaling: Literal["standard", "minmax", "none"] = Field(
+        "standard", description="How to scale columns before reducing them."
+    )
+
+
+class PcaRequest(DimensionalityReductionRequest):
+    """Request body for ``POST /plots/pca``."""
+
+
+class TsneRequest(DimensionalityReductionRequest):
+    """Request body for ``POST /plots/tsne``."""
+
+    perplexity: float = Field(
+        30, ge=5, le=100, description="t-SNE perplexity. Must be less than row count."
+    )
+
+
+class NormalityRequest(BaseModel):
+    """Request body for ``POST /tables/normality``."""
+
+    dataset_key: str = Field(description="S3 key of the CSV dataset to test.")
+    output_key: str = Field(description="S3 key to write the CSV to. Must end '.csv'.")
+    columns: list[str] | None = Field(
+        None, description="Numeric columns to test. Defaults to all numeric columns."
+    )
+
+    @field_validator("output_key")
+    @classmethod
+    def _check_output_key_ends_with_csv(cls, value: str) -> str:
+        """Require ``output_key`` to end with ``.csv``.
+
+        Args:
+            value: The ``output_key`` field value.
+
+        Returns:
+            The value, unchanged.
+
+        Raises:
+            ValueError: If ``value`` doesn't end with ``.csv``.
+        """
+        if not value.endswith(".csv"):
+            raise ValueError("output_key must end with '.csv'")
+        return value
+
+
+class NormalityRow(BaseModel):
+    """Normality test results for one numeric column."""
+
+    column: str = Field(description="The column's name.")
+    n: int = Field(description="Number of non-null values tested.")
+    shapiro_statistic: float = Field(description="Shapiro-Wilk test statistic.")
+    shapiro_p: float = Field(description="Shapiro-Wilk p-value.")
+    ks_statistic: float = Field(description="Kolmogorov-Smirnov test statistic.")
+    ks_p: float = Field(description="Kolmogorov-Smirnov p-value.")
+    normal_at_0_05: bool = Field(
+        description="True when both the Shapiro-Wilk and KS p-values exceed 0.05."
+    )
+
+
+class NormalityResponse(BaseModel):
+    """Response returned by ``POST /tables/normality``."""
+
+    key: str = Field(description="The S3 key the CSV was written to.")
+    content_type: Literal["text/csv"] = "text/csv"
+    size_bytes: int = Field(description="Size of the uploaded CSV, in bytes.")
+    title: str = Field(description="The table's title.")
+    rows: list[NormalityRow] = Field(description="One row per tested column.")
+
+
 class PlotResponse(BaseModel):
     """Response returned by every plot endpoint."""
 
