@@ -116,9 +116,10 @@ For code in `web/`:
 - **`app/(app)/experiments/[id]/layout.tsx`** awaits `params` behind a `<Suspense>` boundary and renders
   `ExperimentHeader`, above `children` (the active tab).
 - **`app/(app)/experiments/[id]/page.tsx`** redirects to the Data tab; #38 replaces this with an overview.
-- **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`, and **`eda/page.tsx`** the EDA tab
-  ([below](#eda-tab)). The other five tab pages (`pipelines`, `runs`, `evaluations`, `predict`, `files`) are
-  "Coming soon" placeholders until their own issues (#26, #26, #35, #37, #38) build them out.
+- **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`, **`eda/page.tsx`** the EDA tab
+  ([below](#eda-tab)) and **`pipelines/…`** the Pipelines tab ([below](#pipelines)). The other four tab pages (`runs`,
+  `evaluations`, `predict`, `files`) are "Coming soon" placeholders until their own issues (#27, #35, #37, #38) build
+  them out.
 - **`components/experiments/experiment-header.tsx`** (`ExperimentHeader`) shows the experiment's name and
   description, `EditExperimentDialog` (PATCH) and `DeleteExperimentButton` (an `AlertDialog` confirm, then
   DELETE and navigate back to `/experiments`), and the tab navigation below them.
@@ -180,6 +181,82 @@ Dataset uploads go through `proxy.ts`, which otherwise buffers request bodies to
 - **`lib/eda.ts`** has the summary, artifact, plot and normality types (EDA's are snake_case, passed through by
   the API), `plotSchema`, `toPlotRequest`, `artifactContentUrl` and the calls to `/api/proxy/experiments/{id}/eda/…`.
 
+## Pipelines
+
+The Pipelines tab (`/experiments/[id]/pipelines`) lists the experiment's saved pipelines. Users build one in an editor
+without writing code. Every step and its settings come from the pipeline catalog (`GET /api/pipeline-catalog`, generated
+from helix-core, see [pipelines.md](pipelines.md#the-catalog)), so the forms are generated from each step's JSON Schema.
+Only the scaler warning below names step ids. The API calls are in [api.md](api.md#pipelines).
+
+- **Pages:** `pipelines/page.tsx` (`PipelinesList`), `pipelines/new/page.tsx` (`PipelineEditor`) and
+  `pipelines/[pipelineId]/page.tsx` (`EditPipeline`, which loads the pipeline into the editor). Each awaits `params` in
+  a `<Suspense>` boundary, like the other tabs.
+- **`pipelines-list.tsx`** (`PipelinesList`): name (links to the editor), model label, feature count and last update,
+  with edit, and delete behind an `alert-dialog` confirm (runs keep their own copy of the spec). The Run button slot is
+  for #27.
+- **`pipeline-editor.tsx`** (`PipelineEditor`): one react-hook-form + zod form in cards:
+  - Name.
+  - Problem and data:
+    - problem type (`radio-group`)
+    - target column (any column)
+    - optional ID column
+    - feature checkboxes: every numeric column other than the target and ID, all ticked to start; text columns are
+      listed disabled as "(not numeric)"
+    - choosing a column as the target or ID removes it from the features
+  - Split: test size, random seed, cross-validation folds (off or 2–10).
+  - Steps (`StepList`).
+  - Model: the catalog's models for the problem type, then its params.
+  - Hyperparameter search (`SearchSettings`).
+
+  Changing the problem type drops the steps and model that don't support the new one, with a toast saying what went.
+  Saving POSTs (or PUTs) and returns to the list. The API's `errors.spec` messages show in an `alert` at the top. The
+  editor needs the dataset's columns, so without a dataset it links to the Data tab.
+- **`step-list.tsx`** (`StepList`): the ordered preprocessing and feature-selection steps (`useFieldArray`).
+  - An "Add step" `dropdown-menu` lists the catalog's preprocessors and feature selectors for the problem type, grouped
+    by kind. An added step starts with its defaults.
+  - Each step shows its label, its description, its params form, and move up / move down / remove buttons.
+- **`step-params-form.tsx`** (`StepParamsForm`): a step's params, generated from its `params_schema` by
+  `lib/json-schema-form.ts`:
+  - a text input per number (a blank nullable one means None), a checkbox per boolean, a select per enum, and a
+    comma-separated input per int list (`100, 50`)
+  - the field's description and limits (e.g. "10 to 1000") as help text
+- **`search-settings.tsx`** (`SearchSettings`): an optional `switch`. Then the method (grid or random), CV folds, and
+  for random the number of combinations to try.
+  - The grid starts as the model's default `search_grid`, shown read-only as badges.
+  - "Customise" turns it into a text field per param: comma-separated candidates (`None` allowed for a nullable param),
+    or `;`-separated lists for an int list param (`50; 100, 50`). Each candidate is checked against the param's schema.
+  - A model with no default grid must be customised.
+- **The scaler warning:** a non-blocking `alert` under the model when a scaler comes before a tree model with nothing
+  scale-sensitive in between: "Tree models don't need scaling, so Min-max scaling has no effect on this model…".
+  `redundantScalerSteps` in `lib/pipelines.ts` mirrors `helix_core.pipelines.redundant_scaler_steps` (the training
+  worker uses it to explain a failed parity check), and both are tested against the same cases.
+- **`lib/json-schema-form.ts`** supports exactly what pydantic emits for the catalog's params:
+  - `integer`, `number` and `boolean`
+  - `enum`
+  - `anyOf: [X, {type: null}]` (nullable)
+  - arrays of integers
+  - bounds (`minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `minItems`, `maxItems`)
+  - `default`, `title`, `description`
+  - local `$ref`s to `#/$defs/…`
+
+  Anything else throws `UnsupportedSchemaError`. `describeFields` turns a schema into field descriptors. `paramsZod`
+  validates a step's params as the form holds them (number inputs as text) and outputs the typed snake_case params.
+  `paramsToForm` goes the other way. A test runs every step of the real `contracts/pipeline-catalog.json` through all
+  of them, so a new catalog step the UI can't render fails CI.
+- **`lib/pipelines.ts`:**
+  - the catalog and spec types (snake_case, as stored)
+  - the fetchers
+  - `emptyForm`, `formFromSpec` and `specFromForm`, which converts between the editor's values and the spec and keeps
+    features in dataset order
+  - `pipelineFormSchema`, the API's rules checked in the browser: columns against the dataset (a regression target
+    must be numeric), steps and params against the catalog, and the search settings
+  - the grid text helpers
+  - `redundantScalerSteps`
+- **`use-pipelines.ts`**: `usePipelineCatalog` (cached for the session, `staleTime: Infinity`), `usePipelines`,
+  `usePipeline`, `useSavePipeline` (create or update) and `useDeletePipeline`.
+- **`lib/api.ts`'s `ApiError`** now keeps a validation problem's `errors`, so the editor can show every message, not
+  just the first.
+
 ## Admin: users
 
 `/admin/users` (linked from the main nav for admins only) lets `helix-admin` users invite colleagues by email, and
@@ -225,8 +302,9 @@ resend or revoke an invitation. It calls the API's invitation endpoints (see [ap
 
 ## shadcn components
 
-Installed: alert-dialog, avatar, badge, button, card, checkbox, collapsible, dialog, dropdown-menu, field, input,
-label, scroll-area, select, separator, skeleton, sonner, table, tabs, textarea and tooltip. Add more with `npx shadcn@latest add <name>` from
+Installed: alert, alert-dialog, avatar, badge, button, card, checkbox, collapsible, dialog, dropdown-menu, field,
+input, label, radio-group, scroll-area, select, separator, skeleton, sonner, switch, table, tabs, textarea and
+tooltip. Add more with `npx shadcn@latest add <name>` from
 `web/`.
 
 Base UI components compose through the `render` prop rather than Radix's `asChild`:
