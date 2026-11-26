@@ -89,6 +89,72 @@ correlation with any earlier column is above `threshold`. A constant column has 
 calculator (`convert_sklearn_feature_selection`, `calculate_sklearn_select`), registered in `register_converters()`.
 
 
+## Training
+
+The training worker (`services/training`, package `helix-training`, command `helix-training`) consumes `TrainingJob`s
+from `training.jobs`. `TrainingWorker` subclasses `helix_core.worker.Worker`, which handles the queue, events,
+ack/reject, health and SIGTERM. Its `handle` loads the CSV, calls `helix_training.train.train` and uploads the results.
+`train` is pure (no AMQP or S3), so it's tested directly.
+
+### Algorithm
+
+1. Re-validate the `PipelineSpec` (it's validated when the job is parsed; this catches a job built another way), then
+   `validate_spec` it against the registry. Select the feature, target and ID columns (`select_features_target`:
+   features must exist and be numeric).
+2. Drop rows with no target value, remembering each remaining row's position in the CSV. At least 20 rows must be left.
+3. **Classification:** label-encode the target. Non-numeric targets are encoded as strings; numeric ones keep their
+   type. There must be at least 2 classes, and every class needs at least 2 rows. `classes` lists the original labels
+   in index order. **Regression:** the target must be numeric.
+4. Split with `train_test_split` (`split.test_size`, `random_state=split.random_seed`, shuffled, stratified for
+   classification). Progress 0.1.
+5. k-NN only: `n_neighbors` (every value, when searching) must be at most the fewest rows the model is fitted on: the
+   training rows, or a training fold of the search's or cross-validation's folds. Otherwise `InvalidSpecError`.
+   scikit-learn only notices at prediction time, and ONNX Runtime fails with an internal error.
+6. With `search`: `GridSearchCV`, or `RandomizedSearchCV` (`n_iter`, `random_state=seed`), over `search_space(spec)`,
+   `cv` = `StratifiedKFold` (classification) or `KFold` (regression) with `search.cv_folds` folds, shuffled and seeded.
+   It parallelises over folds (`n_jobs`), so the model gets one core, refits on the best parameters, and reports
+   `best_params` without the `model__` prefix (MLP layer sizes as lists). Progress 0.5.
+7. With `split.cv_folds`: `cross_validate` a clone of the final configuration on the training rows with the same kind
+   of splitter. The clone's model gets one core, since the folds run in parallel. Progress 0.7.
+8. Without a search, fit the pipeline on the training rows (the search has already refit it).
+9. Export with `to_onnx` and `check_parity` on the test rows. Progress 0.85.
+10. Build `ModelMetadata`, with the output names from `inspect_outputs`.
+
+scikit-learn's `ValueError`s while splitting, searching, cross-validating or fitting come from the data or spec meeting
+the estimator, so they're reported as `InvalidDataError` with the stage named. Like every `HelixError`, they're
+published as a `failed` event and the job is acked, not dead-lettered. So is `OnnxParityError`. When a scaler sits
+before a tree model with nothing scale-sensitive in between (`helix_core.pipelines.redundant_scaler_steps`), its
+message adds: *Tree models (random forest, XGBoost) don't need scaling, and a scaler before one can make the exported
+model differ slightly from the trained one. Try removing '<step>'.* The web app's pipeline builder (#26) warns about the
+same thing with the same rule.
+
+### Metrics
+
+Cross-validation reports `{"mean", "std"}` across folds for each metric:
+
+| Problem type | Metrics |
+| --- | --- |
+| Classification | `accuracy`, `f1_weighted`, `precision_weighted`, `recall_weighted`, `roc_auc` (scikit-learn's `roc_auc` for two classes, `roc_auc_ovr_weighted` for more, reported as `roc_auc` either way) |
+| Regression | `r2`, `mae`, `rmse` (scikit-learn's negated scorers, flipped back to positive) |
+
+The search picks its best parameters on `f1_weighted` (classification) or `r2` (regression). Test-set metrics are the
+evaluation worker's job (#28).
+
+### Outputs
+
+Under the job's `output_prefix` ([architecture.md](architecture.md#storage-layout-s3)):
+
+| Key | Content |
+| --- | --- |
+| `model.onnx` | The fitted pipeline (`application/octet-stream`) |
+| `metadata.json` | `ModelMetadata` ([below](#model-metadata)) |
+| `split.json` | `{"train_index": [...], "test_index": [...]}`: 0-based positions of the rows in the uploaded CSV, so the evaluation worker can re-read the CSV and pick the same rows. Rows with no target are in neither. |
+| `cv_metrics.json` | The cross-validation metrics; only when `split.cv_folds` is set |
+
+The `succeeded` event's `result` is `{"model_key", "metadata_key", "split_key", "cv_metrics_key" (or null),
+"cv_metrics" (or null), "best_params" (or null), "train_rows", "test_rows"}`. Progress events go 0.1, 0.5 (search),
+0.7 (cross-validation), 0.85, 0.95 (uploaded).
+
 ## ONNX export
 
 `helix_core.onnx_export` converts a fitted pipeline, checks the ONNX model against scikit-learn, and reads back its
