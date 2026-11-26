@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 from helix_core.storage import Storage
@@ -148,17 +149,26 @@ def test_tsne_perplexity_greater_than_rows_returns_422(
     assert response.status_code == 422
 
 
-def test_tsne_samples_down_to_5000_rows() -> None:
-    from helix_eda.plots import _TSNE_MAX_ROWS, _prepare_dimensionality_reduction_data
+def test_tsne_samples_down_to_5000_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    from helix_eda import plots
     from helix_eda.schemas import TsneRequest
 
-    df = pd.DataFrame(
-        {"a": range(5100), "b": range(5100, 10200)},
-        dtype=float,
-    )
-    request = TsneRequest(dataset_key="data.csv", output_key="out.png")
-    data, _colours = _prepare_dimensionality_reduction_data(df, request)
-    assert len(data) == 5100
+    fitted_rows: list[int] = []
 
-    sampled = data.sample(n=_TSNE_MAX_ROWS, random_state=42)
-    assert len(sampled) == _TSNE_MAX_ROWS
+    class FakeTSNE:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def fit_transform(self, x: np.ndarray) -> np.ndarray:
+            fitted_rows.append(len(x))
+            return np.zeros((len(x), 2))
+
+    monkeypatch.setattr(plots, "TSNE", FakeTSNE)
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame(rng.normal(size=(5100, 2)), columns=["a", "b"])
+    request = TsneRequest(dataset_key="data.csv", output_key="out.png")
+
+    _fig, title = plots.tsne_plot(df, request)
+
+    assert fitted_rows == [5000]
+    assert "sampled 5000 of 5100 rows" in title
