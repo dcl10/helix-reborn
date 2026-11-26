@@ -42,6 +42,29 @@ model's default `search_grid`. MLP layer sizes become tuples here too.
 file by key, so regenerating it is deterministic. The API validates specs against it (#24) and the web app builds its
 forms from it (#26).
 
+### Validation in the API
+
+The API validates a pipeline when it's saved (`POST`/`PUT /api/experiments/{id}/pipelines…`, see
+[api.md](api.md#pipelines)), against `contracts/pipeline-catalog.json` and the experiment's dataset, so a saved
+pipeline doesn't fail on these when it's run. It applies helix-core's rules, both `PipelineSpec`'s and
+`validate_spec`'s, and adds checks against the dataset's columns:
+
+- `problem_type` is `classification` or `regression`.
+- `target_column` is a dataset column and isn't a feature. For regression it must be numeric.
+- `feature_columns` has at least one column, no duplicates, and each is a dataset column whose inferred type is
+  `numeric`.
+- `id_column`, if given, is a dataset column and isn't a feature.
+- `split.test_size` is 0.05–0.5, and `split.cv_folds` is null or 2–10.
+- Every `steps[i].step` and `model.step` is in the catalog. Steps aren't models and the model is one, each supports the
+  `problem_type`, and its `params` pass its `params_schema` (so unknown parameters are rejected).
+- `search`, if given: `method` is `grid` or `random`, `cv_folds` is 2–10, and `n_iter` is required for `random` and is
+  1–500. `param_grid` keys are model parameters, each with a non-empty list of candidates that each pass that
+  parameter's schema. Without a `param_grid`, the model must have a default `search_grid`.
+- Unknown fields anywhere in the spec are rejected.
+
+Errors name their path: `feature_columns: 'site' is not numeric`, `model.params.n_estimators: 0 should be at least 10`,
+`search.param_grid.alpha[1]: -1 should be at least 0`.
+
 ### Steps
 
 Defaults in brackets. "Both" means classification and regression.

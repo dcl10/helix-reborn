@@ -26,6 +26,8 @@
     <!-- Experiments and datasets (#13): object storage and CSV parsing -->
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="CsvHelper" />
+    <!-- Pipelines (#24): JSON Schema validation of step params against contracts/pipeline-catalog.json -->
+    <PackageReference Include="JsonSchema.Net" />
   </ItemGroup>
 
 </Project>

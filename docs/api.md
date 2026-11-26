@@ -16,7 +16,8 @@ api/
     Program.cs                   composition root
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
-    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options, EdaOptions)
+    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options, EdaOptions,
+                                 ContractsOptions)
     Controllers/                 one per resource, thin
     Filters/                     MVC filters (RejectOversizedUploadAttribute)
     Models/                      request/response types
@@ -26,6 +27,8 @@ api/
       Experiments/               IExperimentService, ExperimentService, ExperimentNotFoundException
       Datasets/                  IDatasetService, DatasetService, CsvInspector and their exceptions
       Eda/                       IEdaService, EdaService; IEdaClient, EdaClient over the EDA service; their exceptions
+      Pipelines/                 IPipelineCatalog (contracts/pipeline-catalog.json), PipelineSpec, PipelineSpecValidator,
+                                 IPipelineService, PipelineService and their exceptions
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
       Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
       Storage/                   IObjectStorage, S3ObjectStorage, StorageKeys
@@ -59,6 +62,10 @@ first use.
   with `uv run helix-eda`, and `http://eda:8000` inside Compose, through `Eda__BaseUrl`), `Audience` (`helix-eda`,
   must match the Keycloak audience mapper and EDA's `HELIX_EDA_AUDIENCE`) and `TimeoutSeconds` (default 120, since
   t-SNE can be slow). Calls also need `Keycloak:Secret`; see [EDA](#eda).
+- **`Contracts`** (`ContractsOptions`) — `Root`, the generated `contracts/` directory (default `contracts`). A relative
+  path is looked for in the content root and each parent, then the app's base directory and each parent, so the repo's
+  own `contracts/` is found from `dotnet run` and tests. The Docker image copies `contracts/` to `/app/contracts` and
+  sets `Contracts__Root` to it. See [Pipelines](#pipelines).
 
 ## Auth
 
@@ -220,6 +227,55 @@ experiment's calls (`FailFor`). `EdaClientTests` build the real `AddEda` registr
 stubbed to a fixed token and a stub `HttpMessageHandler`, so paths, bodies, the `Authorization` header and error
 mapping are tested through the real handler chain.
 
+## Pipelines
+
+A pipeline is a saved, named `PipelineSpec` in an experiment: target, features, split, preprocessing steps, model and
+optional hyperparameter search. The allowed steps come from `contracts/pipeline-catalog.json`, generated from
+helix-core's registry (#22). The API serves the catalog and checks every saved pipeline against it; nothing in C# names
+a step. Running pipelines is #25.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `GET` | `/api/pipeline-catalog` | The catalog JSON exactly as in the file. Any signed-in user. |
+| `GET` | `/api/experiments/{id}/pipelines` | The experiment's pipelines, by name. |
+| `POST` | `/api/experiments/{id}/pipelines` | `{"name", "spec"}`: validates and saves one. `201` with `Location`. Owner only. |
+| `GET` | `/api/experiments/{id}/pipelines/{pipelineId}` | One pipeline. |
+| `PUT` | `/api/experiments/{id}/pipelines/{pipelineId}` | `{"name", "spec"}`: validates and replaces the name and spec. Owner only. |
+| `DELETE` | `/api/experiments/{id}/pipelines/{pipelineId}` | `204`. Owner only. Runs keep their own copy of the spec (#25). |
+
+A `PipelineResponse` is `{"id", "name", "spec", "createdAt", "updatedAt"}`. `spec` is the **snake_case** contract,
+unlike the rest of the API: it's stored and sent to the training worker as is. Errors:
+
+| Cause | Response |
+| --- | --- |
+| Experiment missing or not visible, pipeline not in it, or an admin writing | `404` |
+| No dataset uploaded (the spec's columns are checked against it) | `409` |
+| Name already used in the experiment | `409` |
+| `name` missing or longer than 100 characters, or `spec` missing | `400` (model validation) |
+| Invalid spec | `400` `ValidationProblemDetails` with every problem under `errors.spec`, e.g. `"steps[1].params.k: 0 should be at least 1"` |
+
+**Catalog.** `PipelineCatalog` (singleton) reads `pipeline-catalog.json` from `Contracts:Root` and compiles each
+step's `params_schema` with JsonSchema.Net, in a schema registry of its own. `PipelineCatalogStartupCheck`, a hosted
+service, resolves it at startup, so a missing or invalid catalog stops the app instead of failing the first pipeline
+request.
+
+**Spec.** `PipelineSpec` and its records mirror helix-core's `PipelineSpec`. `PipelineSpecJson` reads and writes them
+in snake_case with unknown properties rejected (helix-core's models are `extra="forbid"`), and fills in the defaults
+for `split`, `steps` and `params`, so the stored spec states them. `PipelineSpecValidator` applies the same rules as
+helix-core, plus checks against the dataset's columns; they're listed in
+[pipelines.md](pipelines.md#validation-in-the-api). Parameter errors come from evaluating each step's params, and
+each `param_grid` candidate on its own, against the step's JSON Schema. Errors from container keywords (`properties`,
+`items`, `anyOf`) and the null branch of an optional parameter are dropped, so each problem is one line naming its
+path.
+
+**Storage.** `Pipelines` table: `Name` (up to 100 characters, unique per experiment), `SpecJson` (`jsonb`, the
+normalised snake_case spec), timestamps, and a cascade delete with the experiment. Two concurrent saves with the same
+name hit the unique index, and the loser gets the same `409`.
+
+Tests: `PipelineCatalogTests` and `PipelineSpecValidatorTests` use the repo's real catalog, found the same way as
+the app finds it. `PipelinesControllerTests` covers the endpoints, and `PipelineCatalogStartupTests` checks that the
+app won't start without a catalog.
+
 ## Running it
 
 ```bash
@@ -236,8 +292,8 @@ run the EDA service too (`cd services && uv run helix-eda`, port 8000) and start
 ## Migrations
 
 The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table and
-`AddExperiments` the `Experiments` and `Datasets` tables, and `AddArtifacts` the `Artifacts` table; further domain
-entities are added by later issues.
+`AddExperiments` the `Experiments` and `Datasets` tables, `AddArtifacts` the `Artifacts` table, and `AddPipelines` the
+`Pipelines` table; further domain entities are added by later issues.
 
 ```bash
 cd api

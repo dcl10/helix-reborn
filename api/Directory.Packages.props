@@ -26,6 +26,11 @@
     <PackageVersion Include="CsvHelper" Version="34.1.0" />
   </ItemGroup>
 
+  <!-- Pipelines (#24): validates each step's params against the catalog's JSON Schemas -->
+  <ItemGroup>
+    <PackageVersion Include="JsonSchema.Net" Version="9.7.0" />
+  </ItemGroup>
+
   <!-- EF Core -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
