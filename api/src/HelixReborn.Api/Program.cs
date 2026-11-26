@@ -17,6 +17,9 @@ builder.Services.AddInvitations(builder.Configuration);
 builder.Services.AddObjectStorage();
 builder.Services.AddExperiments();
 
+// Exploratory data analysis, made by the EDA service (called with a helix-api service token).
+builder.Services.AddEda(builder.Configuration);
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

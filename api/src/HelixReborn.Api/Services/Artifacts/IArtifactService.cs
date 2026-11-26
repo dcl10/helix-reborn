@@ -30,6 +30,33 @@ public interface IArtifactService
     Guid? sourceId,
     CancellationToken cancellationToken = default);
 
+  /// <summary>
+  /// Records a file that's already been uploaded to object storage as an artifact with a given ID, for callers that
+  /// need the ID before the file exists (EDA puts it in the storage key).
+  /// </summary>
+  /// <param name="artifactId">The new artifact's ID.</param>
+  /// <param name="experimentId">The owning experiment's ID.</param>
+  /// <param name="kind">What kind of file this is.</param>
+  /// <param name="title">Human readable title, e.g. "Correlation heatmap".</param>
+  /// <param name="storageKey">The S3 key the file is stored at.</param>
+  /// <param name="contentType">The file's content type.</param>
+  /// <param name="sizeBytes">Size of the file, in bytes.</param>
+  /// <param name="sourceType">What produced the file, e.g. <c>"eda"</c>.</param>
+  /// <param name="sourceId">The ID of the thing that produced the file.</param>
+  /// <param name="cancellationToken">Cancels the call.</param>
+  /// <returns>The new artifact.</returns>
+  Task<Artifact> RecordAsync(
+    Guid artifactId,
+    Guid experimentId,
+    ArtifactKind kind,
+    string title,
+    string storageKey,
+    string contentType,
+    long sizeBytes,
+    string? sourceType,
+    Guid? sourceId,
+    CancellationToken cancellationToken = default);
+
   /// <summary>Lists an experiment's artifacts, ordered by <see cref="Artifact.CreatedAt"/>.</summary>
   /// <param name="experimentId">The experiment's ID.</param>
   /// <param name="sourceType">When given, only artifacts with this source type.</param>

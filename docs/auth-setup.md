@@ -121,7 +121,7 @@ console, switch to the `helix` realm, go to **Clients → `<client>` → Credent
 
 | Secret | Where it goes |
 | --- | --- |
-| `helix-api` | the API's configuration, `Keycloak:Secret` (#5) |
+| `helix-api` | the API's configuration, `Keycloak:Secret` (#5); needed for invitations and for calling EDA |
 | `helix-web` | the web app's configuration, `AUTH_KEYCLOAK_SECRET` (#7) |
 
 **To regenerate a secret**, select **Regenerate** on the same Credentials tab, then update the API or web app's

@@ -10,7 +10,31 @@ using Models;
 public class ArtifactService(AppDbContext db, TimeProvider time) : IArtifactService
 {
   /// <inheritdoc />
+  public Task<Artifact> RecordAsync(
+    Guid experimentId,
+    ArtifactKind kind,
+    string title,
+    string storageKey,
+    string contentType,
+    long sizeBytes,
+    string? sourceType,
+    Guid? sourceId,
+    CancellationToken cancellationToken = default) =>
+    RecordAsync(
+      Guid.NewGuid(),
+      experimentId,
+      kind,
+      title,
+      storageKey,
+      contentType,
+      sizeBytes,
+      sourceType,
+      sourceId,
+      cancellationToken);
+
+  /// <inheritdoc />
   public async Task<Artifact> RecordAsync(
+    Guid artifactId,
     Guid experimentId,
     ArtifactKind kind,
     string title,
@@ -23,7 +47,7 @@ public class ArtifactService(AppDbContext db, TimeProvider time) : IArtifactServ
   {
     var artifact = new Artifact
     {
-      Id = Guid.NewGuid(),
+      Id = artifactId,
       ExperimentId = experimentId,
       Kind = kind,
       Title = title,

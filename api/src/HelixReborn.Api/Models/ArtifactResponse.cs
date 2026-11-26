@@ -19,4 +19,19 @@ public record ArtifactResponse(
   string? SourceType,
   Guid? SourceId,
   DateTimeOffset CreatedAt,
-  string FileName);
+  string FileName)
+{
+  /// <summary>Builds the response for an artifact; the file name is the storage key's last path segment.</summary>
+  /// <param name="artifact">The artifact.</param>
+  /// <returns>The response.</returns>
+  public static ArtifactResponse From(Artifact artifact) => new(
+    artifact.Id,
+    artifact.Kind,
+    artifact.Title,
+    artifact.ContentType,
+    artifact.SizeBytes,
+    artifact.SourceType,
+    artifact.SourceId,
+    artifact.CreatedAt,
+    artifact.StorageKey.Split('/')[^1]);
+}

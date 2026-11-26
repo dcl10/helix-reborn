@@ -23,4 +23,14 @@ public class StorageKeysTests
       "experiments/11111111-1111-1111-1111-111111111111/datasets/22222222-2222-2222-2222-222222222222/bone.csv",
       StorageKeys.Dataset(ExperimentId, DatasetId, "bone.csv"));
   }
+
+  [Fact]
+  public void Eda_ReturnsKey()
+  {
+    var artifactId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    Assert.Equal(
+      "experiments/11111111-1111-1111-1111-111111111111/eda/33333333-3333-3333-3333-333333333333.png",
+      StorageKeys.Eda(ExperimentId, artifactId, "png"));
+  }
 }

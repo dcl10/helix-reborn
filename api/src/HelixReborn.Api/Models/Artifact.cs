@@ -3,7 +3,7 @@ namespace HelixReborn.Api.Models;
 /// <summary>
 /// A file produced by or uploaded to an experiment: the dataset, EDA plots and tables, a run's model and metadata,
 /// evaluation plots and tables, or predictions. Later issues register these through
-/// <see cref="Services.Artifacts.IArtifactService.RecordAsync"/> as they produce files.
+/// <c>RecordAsync</c> on <see cref="Services.Artifacts.IArtifactService"/> as they produce files.
 /// </summary>
 public class Artifact
 {
