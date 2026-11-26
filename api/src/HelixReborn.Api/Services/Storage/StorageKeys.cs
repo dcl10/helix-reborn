@@ -28,4 +28,10 @@ public static class StorageKeys
   /// <returns><c>experiments/{experimentId}/eda/{artifactId}.{extension}</c></returns>
   public static string Eda(Guid experimentId, Guid artifactId, string extension) =>
     $"{Experiment(experimentId)}eda/{artifactId:D}.{extension}";
+
+  /// <summary>The prefix a training run's worker writes its model and files under.</summary>
+  /// <param name="experimentId">The experiment's ID.</param>
+  /// <param name="runId">The run's ID.</param>
+  /// <returns><c>experiments/{experimentId}/runs/{runId}/</c></returns>
+  public static string RunPrefix(Guid experimentId, Guid runId) => $"{Experiment(experimentId)}runs/{runId:D}/";
 }

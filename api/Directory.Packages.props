@@ -31,6 +31,11 @@
     <PackageVersion Include="JsonSchema.Net" Version="9.7.0" />
   </ItemGroup>
 
+  <!-- Training runs (#25): publishes jobs to and consumes events from RabbitMQ (async 7.x API) -->
+  <ItemGroup>
+    <PackageVersion Include="RabbitMQ.Client" Version="7.3.0" />
+  </ItemGroup>
+
   <!-- EF Core -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />

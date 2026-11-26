@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   /// <summary>Saved pipeline specs, per experiment.</summary>
   public DbSet<Pipeline> Pipelines => Set<Pipeline>();
 
+  /// <summary>Training runs: a pipeline snapshot and the worker's progress.</summary>
+  public DbSet<Run> Runs => Set<Run>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -98,6 +101,30 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         .WithMany()
         .HasForeignKey(x => x.ExperimentId)
         .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    modelBuilder.Entity<Run>(run =>
+    {
+      run.Property(x => x.PipelineName).HasMaxLength(100);
+      run.Property(x => x.SpecJson).HasColumnType("jsonb");
+      run.Property(x => x.ResultJson).HasColumnType("jsonb");
+      run.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+      run.Property(x => x.ErrorType).HasMaxLength(100);
+      run.Ignore(x => x.IsTerminal);
+
+      run.HasIndex(x => x.ExperimentId);
+      run.HasIndex(x => x.JobId).IsUnique();
+
+      run.HasOne<Experiment>()
+        .WithMany()
+        .HasForeignKey(x => x.ExperimentId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      // A run outlives its pipeline: it keeps the spec snapshot and loses only the link.
+      run.HasOne<Pipeline>()
+        .WithMany()
+        .HasForeignKey(x => x.PipelineId)
+        .OnDelete(DeleteBehavior.SetNull);
     });
   }
 }
