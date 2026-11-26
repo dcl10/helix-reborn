@@ -182,6 +182,38 @@ namespace HelixReborn.Api.Data.Migrations
                     b.ToTable("Invitations");
                 });
 
+            modelBuilder.Entity("HelixReborn.Api.Models.Pipeline", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExperimentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SpecJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExperimentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Pipelines");
+                });
+
             modelBuilder.Entity("HelixReborn.Api.Models.Artifact", b =>
                 {
                     b.HasOne("HelixReborn.Api.Models.Experiment", null)
@@ -196,6 +228,15 @@ namespace HelixReborn.Api.Data.Migrations
                     b.HasOne("HelixReborn.Api.Models.Experiment", null)
                         .WithOne("Dataset")
                         .HasForeignKey("HelixReborn.Api.Models.Dataset", "ExperimentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HelixReborn.Api.Models.Pipeline", b =>
+                {
+                    b.HasOne("HelixReborn.Api.Models.Experiment", null)
+                        .WithMany()
+                        .HasForeignKey("ExperimentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

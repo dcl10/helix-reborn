@@ -32,7 +32,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS api
 ARG HELIX_VERSION=dev
 WORKDIR /app
 COPY --from=build /out/app ./
-ENV Helix__Version=$HELIX_VERSION
+# The generated pipeline catalog (#24), loaded and checked at startup.
+COPY contracts ./contracts
+ENV Helix__Version=$HELIX_VERSION \
+    Contracts__Root=/app/contracts
 USER app
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "HelixReborn.Api.dll"]

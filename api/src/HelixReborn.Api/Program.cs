@@ -20,6 +20,9 @@ builder.Services.AddExperiments();
 // Exploratory data analysis, made by the EDA service (called with a helix-api service token).
 builder.Services.AddEda(builder.Configuration);
 
+// Pipelines: the step catalog from contracts/pipeline-catalog.json, and saved, validated pipeline specs.
+builder.Services.AddPipelines();
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

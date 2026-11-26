@@ -22,6 +22,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   /// <summary>Files registered against an experiment: datasets, EDA, models, evaluations, predictions.</summary>
   public DbSet<Artifact> Artifacts => Set<Artifact>();
 
+  /// <summary>Saved pipeline specs, per experiment.</summary>
+  public DbSet<Pipeline> Pipelines => Set<Pipeline>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -78,6 +81,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       artifact.HasIndex(x => x.SourceId);
 
       artifact.HasOne<Experiment>()
+        .WithMany()
+        .HasForeignKey(x => x.ExperimentId)
+        .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    modelBuilder.Entity<Pipeline>(pipeline =>
+    {
+      pipeline.Property(x => x.Name).HasMaxLength(100);
+      pipeline.Property(x => x.SpecJson).HasColumnType("jsonb");
+
+      // Unique per experiment; also serves lookups by experiment.
+      pipeline.HasIndex(x => new { x.ExperimentId, x.Name }).IsUnique();
+
+      pipeline.HasOne<Experiment>()
         .WithMany()
         .HasForeignKey(x => x.ExperimentId)
         .OnDelete(DeleteBehavior.Cascade);
