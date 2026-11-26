@@ -141,6 +141,23 @@ Workers use prefetch 1 and handle messages one at a time (see `helix_core.worker
 
 ## Validated by the API
 
-The C# API's tests (#24) load these schema files and validate the messages it builds and the events it receives
-against them, so a mismatch between `helix_core.messages` and the API's own message types fails a test instead of
-surfacing as a runtime error against a shared RabbitMQ instance.
+The API's C# side of the messages is in `api/src/HelixReborn.Api/Messaging/`:
+
+- `JobMessages.cs` has the `TrainingJob`, `EvaluationJob` (shape only, for #34), `JobEvent` and `JobError` records,
+  serialized by `JobMessageJson.Options` (snake_case). A `TrainingJob`'s `pipeline` is the run's stored spec JSON,
+  embedded as is.
+- `Queues.cs` has the queue and exchange names, and `DeclareTopologyAsync`, which declares the same exchange, queues,
+  bindings and arguments as helix-core's `declare_topology`.
+
+`JobMessagesSchemaTests` checks the C# side against the Python side's generated schemas:
+
+- It serializes a `TrainingJob` (with a real normalised spec) and a `JobEvent` for every status, and validates them
+  with JsonSchema.Net against `contracts/messages/training-job.schema.json` and `job-event.schema.json`.
+- It reads the `TrainingJob` and `JobEvent` examples out of [architecture.md](architecture.md#messaging-rabbitmq),
+  filling in the elided `"…"` IDs, then deserializes them and checks the event against its schema. So the docs can't
+  drift from the code either.
+
+A mismatch between `helix_core.messages` and the C# records fails a test, instead of failing at runtime against a
+shared RabbitMQ. `RabbitMqIntegrationTests` (skipped unless `HELIX_INTEGRATION=1`, with `docker compose up -d
+rabbitmq`) declares the topology against the real broker, so it also catches mismatched queue arguments, which
+RabbitMQ rejects with `PRECONDITION_FAILED`. It then publishes a job and reads it back.
