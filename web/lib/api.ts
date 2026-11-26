@@ -10,6 +10,8 @@ export class ApiError extends Error {
     readonly status: number,
     /** The problem's `title`, which some errors use as a category (such as `Active request limit reached`). */
     readonly title?: string,
+    /** A validation problem's messages by field, such as `{ spec: ["feature_columns: 'site' is not numeric"] }`. */
+    readonly errors?: Record<string, string[]>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -45,7 +47,7 @@ export async function readApiError(response: Response): Promise<ApiError> {
     firstError ??
     problem.title ??
     `Request failed (${response.status}).`;
-  return new ApiError(message, response.status, problem.title);
+  return new ApiError(message, response.status, problem.title, problem.errors);
 }
 
 /**
