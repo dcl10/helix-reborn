@@ -1,9 +1,9 @@
-"""Generate JSON Schemas for the message contracts shared with the API.
+"""Generate JSON Schemas for the message and model-metadata contracts.
 
-The schemas under ``contracts/messages/`` are generated, not hand-written: they are
-the JSON Schema form of the pydantic models in :mod:`helix_core.messages`, which is
-the source of truth. #22 extends :func:`build_schemas` with the pipeline catalog and
-model-metadata schemas, via the same registry pattern.
+The schemas under ``contracts/`` are generated, not hand-written: they are the JSON
+Schema form of the pydantic models in :mod:`helix_core.messages` and
+:mod:`helix_core.model_metadata`, which are the source of truth. #22 extends
+:func:`build_schemas` with the pipeline catalog schema, via the same registry pattern.
 """
 
 import argparse
@@ -14,25 +14,38 @@ from pathlib import Path
 from typing import Any
 
 from helix_core.messages import EvaluationJob, JobEvent, PipelineSpec, TrainingJob
+from helix_core.model_metadata import ModelMetadata
 
-_SCHEMA_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
+_MESSAGE_SCHEMA_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
     "training-job": TrainingJob.model_json_schema,
     "evaluation-job": EvaluationJob.model_json_schema,
     "job-event": JobEvent.model_json_schema,
     "pipeline-spec": PipelineSpec.model_json_schema,
 }
 
+_TOP_LEVEL_SCHEMA_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
+    "model-metadata": ModelMetadata.model_json_schema,
+}
+
 
 def build_schemas() -> dict[str, dict[str, Any]]:
-    """Build the JSON Schema for every registered message.
+    """Build the JSON Schema for every registered message and top-level contract.
 
     Returns:
-        A mapping of schema name (e.g. ``"training-job"``) to its JSON Schema.
+        A mapping of schema name (e.g. ``"training-job"``, ``"model-metadata"``) to
+        its JSON Schema.
     """
-    return {name: builder() for name, builder in _SCHEMA_BUILDERS.items()}
+    return {
+        name: builder()
+        for name, builder in (
+            _MESSAGE_SCHEMA_BUILDERS | _TOP_LEVEL_SCHEMA_BUILDERS
+        ).items()
+    }
 
 
 def _schema_path(root: Path, name: str) -> Path:
+    if name in _TOP_LEVEL_SCHEMA_BUILDERS:
+        return root / "contracts" / f"{name}.schema.json"
     return root / "contracts" / "messages" / f"{name}.schema.json"
 
 
