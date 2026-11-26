@@ -17,6 +17,8 @@ SCHEMA_VERSION = 1
 
 ProblemType = Literal["classification", "regression"]
 
+PlotStyle = Literal["white", "dark", "whitegrid", "darkgrid", "ticks"]
+
 
 class StepSpec(BaseModel):
     """One step in a pipeline: a catalog id plus its parameters.
@@ -157,7 +159,7 @@ class PlotOptions(BaseModel):
     width: float = 10
     height: float = 8
     title: str | None = None
-    style: str = "whitegrid"
+    style: PlotStyle = "whitegrid"
     colour_map: str = "viridis"
     axis_font_size: int = 12
     tick_size: int = 10
