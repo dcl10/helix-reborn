@@ -234,7 +234,7 @@ Python services use `pydantic-settings` with prefix `HELIX_`:
 The API uses ASP.NET configuration sections (env vars use `__`, e.g. `S3__Bucket`): `ConnectionStrings:DefaultConnection`,
 `Keycloak` (`AuthServerUrl`, `Realm` = `helix`, `Resource` = `helix-api`, `Secret`, `RequireHttpsMetadata`),
 `Invitations`, `S3` (`ServiceUrl`, `Region`, `AccessKey`, `SecretKey`, `Bucket`, `ForcePathStyle`), `RabbitMq`
-(`Url`), `Eda` (`BaseUrl`, `Audience` = `helix-eda`, `TimeoutSeconds`), `Helix` (`Version`).
+(`Url`), `Eda` (`BaseUrl`, `Audience` = `helix-eda`, `TimeoutSeconds`), `Contracts` (`Root`), `Helix` (`Version`).
 
 ## Local ports
 
