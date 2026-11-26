@@ -116,9 +116,9 @@ For code in `web/`:
 - **`app/(app)/experiments/[id]/layout.tsx`** awaits `params` behind a `<Suspense>` boundary and renders
   `ExperimentHeader`, above `children` (the active tab).
 - **`app/(app)/experiments/[id]/page.tsx`** redirects to the Data tab; #38 replaces this with an overview.
-- **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`. The other six tab pages
-  (`eda`, `pipelines`, `runs`, `evaluations`, `predict`, `files`) are "Coming soon" placeholders until
-  their own issues (#20, #26, #26, #35, #37, #38) build them out.
+- **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`, and **`eda/page.tsx`** the EDA tab
+  ([below](#eda-tab)). The other five tab pages (`pipelines`, `runs`, `evaluations`, `predict`, `files`) are
+  "Coming soon" placeholders until their own issues (#26, #26, #35, #37, #38) build them out.
 - **`components/experiments/experiment-header.tsx`** (`ExperimentHeader`) shows the experiment's name and
   description, `EditExperimentDialog` (PATCH) and `DeleteExperimentButton` (an `AlertDialog` confirm, then
   DELETE and navigate back to `/experiments`), and the tab navigation below them.
@@ -143,6 +143,42 @@ For code in `web/`:
 
 Dataset uploads go through `proxy.ts`, which otherwise buffers request bodies to Next's ~10 MB default;
 `next.config.ts` raises this to 50 MB with `experimental.proxyClientMaxBodySize`.
+
+## EDA tab
+
+`/experiments/[id]/eda` explores the experiment's dataset through the API's EDA endpoints
+([api.md](api.md#eda)), which call the EDA service. Everything is in `components/eda/`:
+
+- **`eda-tab.tsx`** (`EdaTab`) loads the summary. When the API answers 409 (no dataset) it links to the Data tab;
+  otherwise it shows four cards: Summary, Create a plot, Normality tests and Plots.
+- **`summary-table.tsx`** (`SummaryTable`) has one row per column: a numeric/text badge, missing (count and %),
+  unique, and mean, std, min, median and max to 4 significant figures (`—` where null). A text column's name has a
+  tooltip with its top values.
+- **`plot-builder.tsx`** (`PlotBuilder`) is one react-hook-form + zod form (`plotSchema` in `lib/eda.ts`) holding
+  every plot type's fields, so switching type keeps what was entered. It shows only the chosen type's fields:
+  target column, bins and KDE for a target distribution; numeric columns, method and annotate for a correlation
+  heatmap; 2–10 numeric columns, hue, corner and diagonal for a pairplot; numeric columns, colour column and scaling
+  for PCA, plus perplexity for t-SNE. The limits are the EDA service's own. `toPlotRequest` sends only the chosen
+  type's fields, in snake_case, with an empty column list or choice as `null` ("all numeric columns" / "none").
+  Generate shows a spinner and "This can take up to a minute"; the API's error (EDA's own message) shows inline.
+- **`plot-options-form.tsx`** (`PlotOptionsForm`) is the builder's collapsible "Plot options": title, style, colour
+  map, size, DPI, fonts and label rotation. Empty fields are left out so EDA's defaults apply. The keys are
+  snake_case (`title_font_size`): the API passes `plotOptions` to EDA as-is, and EDA rejects unknown keys.
+- **`form-fields.tsx`** has the builder's field helpers, each a `Controller` around a shadcn `field`:
+  `SelectField` (Base UI `Select` with an `items` map, plus an optional "none" choice stored as `""`),
+  `NumberField` (empty means `undefined`), `TextField`, `CheckboxField` and `ColumnChecklist`, the multi-select: a
+  list of `checkbox`es in a `scroll-area`, keeping the columns' order.
+- **`normality-table.tsx`** (`NormalityTable`) runs the normality tests on every numeric column and shows the
+  latest run's results with a ✓/✗ "Normal (p > 0.05)" column. The API also saves each run as a CSV artifact.
+- **`plot-gallery.tsx`** (`PlotGallery`) shows the experiment's `edaPlot` artifacts, newest first, as cards with
+  the title, the image, when it was made and a download link (`?download=true`). The image opens full size in a
+  `dialog`. Images are plain `<img loading="lazy">` from `/api/proxy/…/artifacts/{id}/content`: `next/image` can't
+  fetch through the authenticated proxy.
+- **`use-eda.ts`** wraps `lib/eda.ts` in TanStack Query: `useEdaSummary` (409 becomes `null`), `useEdaArtifacts`,
+  and the `useCreatePlot` and `useRunNormalityTests` mutations, which refresh the artifacts and never retry
+  (`retry: false`): a plot can take a minute, and a bad request won't change on retry.
+- **`lib/eda.ts`** has the summary, artifact, plot and normality types (EDA's are snake_case, passed through by
+  the API), `plotSchema`, `toPlotRequest`, `artifactContentUrl` and the calls to `/api/proxy/experiments/{id}/eda/…`.
 
 ## Admin: users
 
@@ -184,13 +220,13 @@ resend or revoke an invitation. It calls the API's invitation endpoints (see [ap
 | Tables | `@tanstack/react-table` | shadcn data-table pattern, for later list pages |
 | Toasts | `sonner` | `toast()` from anywhere |
 | Client data | `@tanstack/react-query` | polling, mutations, cache invalidation |
-| Tests | `vitest`, Testing Library, `jsdom`, `@vitejs/plugin-react` | colocated `*.test.tsx` |
+| Tests | `vitest`, Testing Library, `jsdom`, `@vitejs/plugin-react` | colocated `*.test.tsx`; `vitest.setup.ts` fills in browser APIs jsdom lacks (`ResizeObserver`, `matchMedia`, pointer capture, `getAnimations`) |
 | Lint and format | `eslint` + `eslint-config-next`, `prettier`, `eslint-plugin-simple-import-sort`, `husky` + `lint-staged` | |
 
 ## shadcn components
 
-Installed: alert-dialog, avatar, badge, button, card, dialog, dropdown-menu, field, input, label, scroll-area, select,
-separator, skeleton, sonner, table, tabs, textarea and tooltip. Add more with `npx shadcn@latest add <name>` from
+Installed: alert-dialog, avatar, badge, button, card, checkbox, collapsible, dialog, dropdown-menu, field, input,
+label, scroll-area, select, separator, skeleton, sonner, table, tabs, textarea and tooltip. Add more with `npx shadcn@latest add <name>` from
 `web/`.
 
 Base UI components compose through the `render` prop rather than Radix's `asChild`:

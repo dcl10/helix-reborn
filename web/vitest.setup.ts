@@ -32,6 +32,11 @@ if (!Element.prototype.setPointerCapture) {
   Element.prototype.hasPointerCapture = () => false;
 }
 
+// Base UI waits for exit animations with Element.getAnimations(), which jsdom doesn't implement.
+if (!Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = () => [];
+}
+
 afterEach(() => {
   cleanup();
 });
