@@ -2,10 +2,9 @@ namespace HelixReborn.Api.Services.Storage;
 
 /// <summary>
 /// S3 key layout, shared with the Python services (see <c>docs/architecture.md</c>, "Storage layout"). IDs are
-/// formatted lowercase with hyphens (<c>"D"</c>). Only the dataset key is built here: EDA, run, evaluation and
-/// prediction keys are built by the Python services that write those files and recorded as
-/// <see cref="Models.Artifact"/>s through <see cref="Artifacts.IArtifactService.RecordAsync"/>, but follow the
-/// same layout.
+/// formatted lowercase with hyphens (<c>"D"</c>). The dataset and EDA keys are built here (the API tells EDA where to
+/// write); run, evaluation and prediction keys are built by the Python workers that write those files and recorded
+/// as <see cref="Models.Artifact"/>s, but follow the same layout.
 /// </summary>
 public static class StorageKeys
 {
@@ -21,4 +20,12 @@ public static class StorageKeys
   /// <returns><c>experiments/{experimentId}/datasets/{datasetId}/{fileName}</c></returns>
   public static string Dataset(Guid experimentId, Guid datasetId, string fileName) =>
     $"{Experiment(experimentId)}datasets/{datasetId:D}/{fileName}";
+
+  /// <summary>The key an EDA plot or table is stored at.</summary>
+  /// <param name="experimentId">The experiment's ID.</param>
+  /// <param name="artifactId">The artifact's ID.</param>
+  /// <param name="extension">The file extension, without the dot: <c>png</c> or <c>csv</c>.</param>
+  /// <returns><c>experiments/{experimentId}/eda/{artifactId}.{extension}</c></returns>
+  public static string Eda(Guid experimentId, Guid artifactId, string extension) =>
+    $"{Experiment(experimentId)}eda/{artifactId:D}.{extension}";
 }

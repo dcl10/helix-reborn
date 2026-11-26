@@ -13,7 +13,7 @@ using Services.Storage;
 /// <summary>
 /// An experiment's artifacts: the dataset, EDA plots and tables, a run's model and metadata, evaluation plots and
 /// tables, and predictions. Owner or <c>helix-admin</c> can read; artifacts are only ever written by other services
-/// through <see cref="IArtifactService.RecordAsync"/>.
+/// through <c>RecordAsync</c> on <see cref="IArtifactService"/>.
 /// </summary>
 /// <param name="experiments">Checks the experiment is visible to the caller.</param>
 /// <param name="artifacts">The artifact registry.</param>
@@ -47,7 +47,7 @@ public class ArtifactsController(
     }
 
     var list = await artifacts.ListAsync(experimentId, sourceType, sourceId, cancellationToken);
-    return Ok(list.Select(ToResponse).ToList());
+    return Ok(list.Select(ArtifactResponse.From).ToList());
   }
 
   /// <summary>
@@ -201,15 +201,4 @@ public class ArtifactsController(
     var sanitised = new string([.. name.Select(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' ? c : '_')]);
     return sanitised.Length == 0 ? "experiment" : sanitised;
   }
-
-  private static ArtifactResponse ToResponse(Artifact x) => new(
-    x.Id,
-    x.Kind,
-    x.Title,
-    x.ContentType,
-    x.SizeBytes,
-    x.SourceType,
-    x.SourceId,
-    x.CreatedAt,
-    FileNameOf(x.StorageKey));
 }
