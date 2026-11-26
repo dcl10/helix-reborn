@@ -244,6 +244,7 @@ describe("uploadDataset", () => {
         "The file isn't a valid CSV.",
         400,
         "One or more validation errors occurred.",
+        { file: ["The file isn't a valid CSV."] },
       ),
     );
   });
