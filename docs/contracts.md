@@ -4,17 +4,18 @@ The API (C#) and the Python workers exchange job messages over RabbitMQ. Both si
 shape of those messages, but the two languages can't share a type definition directly. `helix_core.messages`
 (pydantic v2 models) is the source of truth; `helix_core.contracts` exports each model as a JSON Schema file under
 `contracts/messages/`, and the API's tests validate the messages it sends and parses against those schema files
-(#24). This way a change to a message shape fails CI on whichever side doesn't update first, instead of failing at
+(#24). `contracts/model-metadata.schema.json`, generated the same way from `helix_core.model_metadata`, describes the
+`metadata.json` written next to every trained model ([pipelines.md](pipelines.md#model-metadata)). This way a change to a message shape fails CI on whichever side doesn't update first, instead of failing at
 runtime in a shared environment.
 
 ## Regenerating
 
 ```bash
-cd services && uv run python -m helix_core.contracts export   # writes contracts/messages/*.schema.json
+cd services && uv run python -m helix_core.contracts export   # writes contracts/messages/*.schema.json and model-metadata
 cd services && uv run python -m helix_core.contracts check    # exits 1 if the files are stale
 ```
 
-Run `export` after changing anything in `helix_core.messages` and commit the result. `check` is what CI runs to
+Run `export` after changing anything in `helix_core.messages` or `helix_core.model_metadata` and commit the result. `check` is what CI runs to
 catch a forgotten regeneration.
 
 ## Messages

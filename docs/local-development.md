@@ -6,6 +6,7 @@
 - Node 22
 - .NET 10 SDK
 - [uv](https://docs.astral.sh/uv/)
+- macOS only: `brew install libomp`, the OpenMP runtime XGBoost needs (helix-core's tests import it)
 
 ## Starting and stopping the dependencies
 
