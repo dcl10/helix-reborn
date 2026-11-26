@@ -16,7 +16,7 @@ api/
     Program.cs                   composition root
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
-    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options)
+    Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options, EdaOptions)
     Controllers/                 one per resource, thin
     Filters/                     MVC filters (RejectOversizedUploadAttribute)
     Models/                      request/response types
@@ -25,13 +25,14 @@ api/
     Services/
       Experiments/               IExperimentService, ExperimentService, ExperimentNotFoundException
       Datasets/                  IDatasetService, DatasetService, CsvInspector and their exceptions
+      Eda/                       IEdaService, EdaService; IEdaClient, EdaClient over the EDA service; their exceptions
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
       Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
       Storage/                   IObjectStorage, S3ObjectStorage, StorageKeys
     Extensions/                  service registration extensions used by Program.cs
   tests/HelixReborn.Api.Tests/
     Fixtures/                    ApiFactory, test auth handler, test-only admin controller, InMemoryKeycloakUserAdmin,
-                                 InMemoryObjectStorage
+                                 InMemoryObjectStorage, FakeEdaClient
 ```
 
 ## Configuration
@@ -54,6 +55,10 @@ first use.
 - **`S3`** (`S3Options`) — `ServiceUrl` (default `http://localhost:9000`, the local RustFS), `Region` (`us-east-1`),
   `Bucket` (`helix`), `ForcePathStyle` (`true`, which RustFS needs), `AccessKey` and `SecretKey`. The credentials are
   only in `appsettings.Development.json`; set them through the environment everywhere else.
+- **`Eda`** (`EdaOptions`) — `BaseUrl` (default `http://localhost:8001`, EDA in Compose; use `http://localhost:8000`
+  with `uv run helix-eda`, and `http://eda:8000` inside Compose, through `Eda__BaseUrl`), `Audience` (`helix-eda`,
+  must match the Keycloak audience mapper and EDA's `HELIX_EDA_AUDIENCE`) and `TimeoutSeconds` (default 120, since
+  t-SNE can be slow). Calls also need `Keycloak:Secret`; see [EDA](#eda).
 
 ## Auth
 
@@ -173,6 +178,48 @@ Both streaming endpoints write straight to `Response.Body`: `/content` copies th
 in memory. `ZipArchiveEntry` still does a synchronous `Write` on dispose even when opened with `OpenAsync`, so the
 archive endpoint turns on `IHttpBodyControlFeature.AllowSynchronousIO` for itself rather than globally.
 
+## EDA
+
+The web app never talks to the EDA service ([python-services.md](python-services.md#eda-service)) directly. The API
+exposes it under the experiment, checks ownership, calls EDA server-to-server and records every plot and table EDA
+writes as an artifact (`sourceType` `"eda"`, no `sourceId`). Reads are for the owner or `helix-admin`; making plots
+and tables is owner only, so an admin's `POST` on someone else's experiment gets a `404`.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `GET` | `/api/experiments/{id}/eda/summary` | EDA's dataset summary JSON, passed through as-is (snake_case). |
+| `POST` | `/api/experiments/{id}/eda/plots` | `{"type", "options", "plotOptions"}`: renders a plot. `201` with an `ArtifactResponse` (kind `edaPlot`), `Location` its `/content` URL. |
+| `POST` | `/api/experiments/{id}/eda/tables/normality` | `{"columns": [...] \| null}`: Shapiro-Wilk and KS tests. `201` with `{"artifact": ArtifactResponse, "rows": [...]}` (kind `edaTable`; rows passed through from EDA, snake_case). |
+| `GET` | `/api/experiments/{id}/eda/artifacts` | The experiment's EDA artifacts, oldest first. |
+
+`type` is `targetDistribution`, `correlationHeatmap`, `pairplot`, `pca` or `tsne`, each EDA's `/plots/<kebab-case>`
+route. `options` holds that plot's own fields in EDA's snake_case (e.g. `{"columns": ["a", "b"], "method":
+"spearman"}`) and `plotOptions` EDA's `PlotOptions`; the API doesn't validate either, EDA does. The API always sets
+`dataset_key` (the experiment's dataset) and `output_key`, overriding anything in `options`, so a request can't read
+another experiment's data or write outside its own prefix.
+
+For each plot or table, `EdaService` generates the artifact ID first, tells EDA to write to
+`StorageKeys.Eda(experimentId, artifactId, "png" | "csv")` (`experiments/{e}/eda/{artifactId}.png`), and on success
+records the artifact with that ID, EDA's title and the size EDA reports. Errors:
+
+| Cause | Response |
+| --- | --- |
+| Experiment missing or not visible, or an admin writing | `404` |
+| No dataset uploaded, or EDA can't find its file (EDA `404`) | `409` |
+| EDA rejected the request (EDA `422`: unknown or non-numeric column, bad option) | `400`, EDA's message as `detail` |
+| EDA unreachable, timed out, refused the token, or failed; or `Keycloak:Secret` unset | `502` |
+
+**Service token.** `EdaClient` is a typed `HttpClient` (base address `Eda:BaseUrl`, timeout `Eda:TimeoutSeconds`)
+with Duende.AccessTokenManagement's client-credentials handler. Its Duende client, `helix-eda`, signs in as the
+`helix-api` service account (same client ID and `Keycloak:Secret` as the admin API client, separate token cache);
+Keycloak's audience mapper puts `helix-eda` in those tokens' `aud`, which EDA requires. Tokens are cached until they
+expire. Without `Keycloak:Secret`, `EdaClient` fails every call with a `502` before sending anything.
+
+Tests replace `IEdaClient` with `FakeEdaClient`, which records calls and returns canned results, or throws for one
+experiment's calls (`FailFor`). `EdaClientTests` build the real `AddEda` registration with Duende's token manager
+stubbed to a fixed token and a stub `HttpMessageHandler`, so paths, bodies, the `Authorization` header and error
+mapping are tested through the real handler chain.
+
 ## Running it
 
 ```bash
@@ -182,7 +229,9 @@ dotnet run --project src/HelixReborn.Api
 ```
 
 The http profile listens on `http://localhost:5080` (`Properties/launchSettings.json`) — 5000 clashes with macOS
-AirPlay. `GET /api/me` is a quick way to check a token is accepted; `GET /health` needs none.
+AirPlay. `GET /api/me` is a quick way to check a token is accepted; `GET /health` needs none. For the EDA endpoints,
+run the EDA service too (`cd services && uv run helix-eda`, port 8000) and start the API with
+`Eda__BaseUrl=http://localhost:8000`.
 
 ## Migrations
 
@@ -211,7 +260,7 @@ isolated and can run in parallel.
   JWT. `ApiFactory.CreateAnonymousClient()`, `CreateUserClient(...)` and `CreateAdminClient()` build clients with the
   right header set.
 - `ApiFactory` replaces `IObjectStorage` with `InMemoryObjectStorage`, a dictionary keyed by object key, so tests
-  never need RustFS.
+  never need RustFS, and `IEdaClient` with `FakeEdaClient`, so they never need the EDA service.
 - `TestAdminController` (test assembly only) exercises the `AdminOnly` policy before the app has a real admin
   endpoint.
 
