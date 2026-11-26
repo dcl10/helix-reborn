@@ -49,8 +49,9 @@ def register_converters() -> None:
     """Idempotently register extra skl2onnx converters not built in.
 
     Registers ``XGBClassifier``/``XGBRegressor`` via the onnxmltools XGBoost converter,
-    reusing skl2onnx's linear classifier/regressor shape calculators. #22 adds the
-    custom ``CorrelationThreshold`` converter here too.
+    reusing skl2onnx's linear classifier/regressor shape calculators, and Helix's
+    custom ``CorrelationThreshold`` selector (see
+    :mod:`helix_core.pipelines.correlation`).
     """
     global _converters_registered
     if _converters_registered:
@@ -74,6 +75,9 @@ def register_converters() -> None:
         calculate_linear_regressor_output_shapes,
         convert_xgboost,
     )
+    from helix_core.pipelines.correlation import register_correlation_converter
+
+    register_correlation_converter()
     _converters_registered = True
 
 

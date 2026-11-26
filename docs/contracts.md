@@ -5,17 +5,19 @@ shape of those messages, but the two languages can't share a type definition dir
 (pydantic v2 models) is the source of truth; `helix_core.contracts` exports each model as a JSON Schema file under
 `contracts/messages/`, and the API's tests validate the messages it sends and parses against those schema files
 (#24). `contracts/model-metadata.schema.json`, generated the same way from `helix_core.model_metadata`, describes the
-`metadata.json` written next to every trained model ([pipelines.md](pipelines.md#model-metadata)). This way a change to a message shape fails CI on whichever side doesn't update first, instead of failing at
+`metadata.json` written next to every trained model ([pipelines.md](pipelines.md#model-metadata)), and
+`contracts/pipeline-catalog.json` is the pipeline step catalog ([pipelines.md](pipelines.md#the-catalog)). This way a change to a message shape fails CI on whichever side doesn't update first, instead of failing at
 runtime in a shared environment.
 
 ## Regenerating
 
 ```bash
-cd services && uv run python -m helix_core.contracts export   # writes contracts/messages/*.schema.json and model-metadata
+cd services && uv run python -m helix_core.contracts export   # writes contracts/messages/*.schema.json, model-metadata, catalog
 cd services && uv run python -m helix_core.contracts check    # exits 1 if the files are stale
 ```
 
-Run `export` after changing anything in `helix_core.messages` or `helix_core.model_metadata` and commit the result. `check` is what CI runs to
+Run `export` after changing anything in `helix_core.messages`, `helix_core.model_metadata` or `helix_core.pipelines`
+and commit the result. `check` is what CI runs to
 catch a forgotten regeneration.
 
 ## Messages
@@ -40,8 +42,8 @@ Published by the API to `training.jobs`.
 
 ### PipelineSpec
 
-Embedded in `TrainingJob`. `step` is a free string here; the pipeline catalog that validates it against a registry
-is #22.
+Embedded in `TrainingJob`. `step` is a free string here; `contracts/pipeline-catalog.json`
+([pipelines.md](pipelines.md#the-catalog)) lists the valid steps and their parameters.
 
 ```json
 {

@@ -1,0 +1,1177 @@
+{
+  "schema_version": 1,
+  "steps": [
+    {
+      "description": "Subtract each column's mean, without scaling.",
+      "id": "mean_centering",
+      "kind": "preprocessor",
+      "label": "Mean centering",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "A step with no parameters.",
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Scale each column to the range 0 to 1.",
+      "id": "min_max_scaler",
+      "kind": "preprocessor",
+      "label": "Min-max scaling",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "A step with no parameters.",
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Scale each column by its median and interquartile range, so outliers matter less.",
+      "id": "robust_scaler",
+      "kind": "preprocessor",
+      "label": "Robust scaling",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``robust_scaler``.",
+        "properties": {
+          "with_centering": {
+            "default": true,
+            "description": "Subtract each column's median.",
+            "title": "With Centering",
+            "type": "boolean"
+          },
+          "with_scaling": {
+            "default": true,
+            "description": "Divide by each column's interquartile range.",
+            "title": "With Scaling",
+            "type": "boolean"
+          }
+        },
+        "title": "RobustScalerParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Replace missing values with each column's mean, median or most frequent value.",
+      "id": "simple_imputer",
+      "kind": "preprocessor",
+      "label": "Fill missing values",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``simple_imputer``.",
+        "properties": {
+          "strategy": {
+            "default": "median",
+            "description": "The value each missing value is replaced with.",
+            "enum": [
+              "mean",
+              "median",
+              "most_frequent"
+            ],
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "title": "SimpleImputerParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Scale each column to zero mean and unit variance.",
+      "id": "standard_scaler",
+      "kind": "preprocessor",
+      "label": "Standard scaling",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``standard_scaler``.",
+        "properties": {
+          "with_mean": {
+            "default": true,
+            "description": "Subtract each column's mean.",
+            "title": "With Mean",
+            "type": "boolean"
+          },
+          "with_std": {
+            "default": true,
+            "description": "Divide by each column's standard deviation.",
+            "title": "With Std",
+            "type": "boolean"
+          }
+        },
+        "title": "StandardScalerParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Drop columns that are highly correlated with an earlier column.",
+      "id": "correlation_threshold",
+      "kind": "feature_selector",
+      "label": "Correlation threshold",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``correlation_threshold``.",
+        "properties": {
+          "threshold": {
+            "default": 0.9,
+            "description": "Drop a column when its absolute correlation with an earlier column is above this.",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "title": "CorrelationThresholdParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Keep the columns a Lasso model gives non-zero weight.",
+      "id": "lasso_selector",
+      "kind": "feature_selector",
+      "label": "Lasso selection",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``lasso_selector``.",
+        "properties": {
+          "alpha": {
+            "default": 0.05,
+            "description": "Lasso penalty strength; higher keeps fewer columns.",
+            "exclusiveMinimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          }
+        },
+        "title": "LassoSelectorParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Keep the k columns with the strongest univariate relationship to the target (ANOVA F-test or F-regression).",
+      "id": "select_k_best",
+      "kind": "feature_selector",
+      "label": "Select k best",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``select_k_best``.",
+        "properties": {
+          "k": {
+            "default": 10,
+            "description": "How many columns to keep. More than there are keeps them all.",
+            "minimum": 1,
+            "title": "K",
+            "type": "integer"
+          }
+        },
+        "title": "SelectKBestParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Drop columns whose variance is at or below a threshold.",
+      "id": "variance_threshold",
+      "kind": "feature_selector",
+      "label": "Variance threshold",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``variance_threshold``.",
+        "properties": {
+          "threshold": {
+            "default": 0.01,
+            "description": "Drop columns whose variance is at or below this.",
+            "minimum": 0,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "title": "VarianceThresholdParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification",
+        "regression"
+      ],
+      "search_grid": null
+    },
+    {
+      "description": "Linear regression with a mix of L1 and L2 regularisation.",
+      "id": "elastic_net",
+      "kind": "model",
+      "label": "Elastic net",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``elastic_net``.",
+        "properties": {
+          "alpha": {
+            "default": 1.0,
+            "description": "Regularisation strength.",
+            "exclusiveMinimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "l1_ratio": {
+            "default": 0.5,
+            "description": "Mix of L1 (1) and L2 (0) regularisation.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "L1 Ratio",
+            "type": "number"
+          }
+        },
+        "title": "ElasticNetParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "alpha": [
+          0.01,
+          0.1,
+          1
+        ],
+        "l1_ratio": [
+          0.2,
+          0.5,
+          0.8
+        ]
+      }
+    },
+    {
+      "description": "A naive Bayes classifier assuming normally distributed features.",
+      "id": "gaussian_nb",
+      "kind": "model",
+      "label": "Gaussian naive Bayes",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``gaussian_nb``.",
+        "properties": {
+          "var_smoothing": {
+            "default": 1e-09,
+            "description": "Share of the largest variance added for stability.",
+            "exclusiveMinimum": 0,
+            "title": "Var Smoothing",
+            "type": "number"
+          }
+        },
+        "title": "GaussianNbParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "var_smoothing": [
+          1e-09,
+          1e-08,
+          1e-07
+        ]
+      }
+    },
+    {
+      "description": "Predict the majority class of the nearest training rows.",
+      "id": "knn_classifier",
+      "kind": "model",
+      "label": "k-nearest neighbours",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``knn_classifier`` and ``knn_regressor``.",
+        "properties": {
+          "n_neighbors": {
+            "default": 5,
+            "description": "Number of neighbours.",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "N Neighbors",
+            "type": "integer"
+          },
+          "weights": {
+            "default": "uniform",
+            "description": "How neighbours are weighted.",
+            "enum": [
+              "uniform",
+              "distance"
+            ],
+            "title": "Weights",
+            "type": "string"
+          }
+        },
+        "title": "KnnParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "n_neighbors": [
+          3,
+          5,
+          7,
+          11
+        ],
+        "weights": [
+          "uniform",
+          "distance"
+        ]
+      }
+    },
+    {
+      "description": "Predict the average target of the nearest training rows.",
+      "id": "knn_regressor",
+      "kind": "model",
+      "label": "k-nearest neighbours",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``knn_classifier`` and ``knn_regressor``.",
+        "properties": {
+          "n_neighbors": {
+            "default": 5,
+            "description": "Number of neighbours.",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "N Neighbors",
+            "type": "integer"
+          },
+          "weights": {
+            "default": "uniform",
+            "description": "How neighbours are weighted.",
+            "enum": [
+              "uniform",
+              "distance"
+            ],
+            "title": "Weights",
+            "type": "string"
+          }
+        },
+        "title": "KnnParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "n_neighbors": [
+          3,
+          5,
+          7,
+          11
+        ],
+        "weights": [
+          "uniform",
+          "distance"
+        ]
+      }
+    },
+    {
+      "description": "Linear regression with L1 regularisation, which zeroes weak features.",
+      "id": "lasso",
+      "kind": "model",
+      "label": "Lasso regression",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``lasso``.",
+        "properties": {
+          "alpha": {
+            "default": 1.0,
+            "description": "L1 regularisation strength.",
+            "exclusiveMinimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "fit_intercept": {
+            "default": true,
+            "description": "Fit an intercept term.",
+            "title": "Fit Intercept",
+            "type": "boolean"
+          },
+          "max_iter": {
+            "default": 1000,
+            "description": "Maximum iterations.",
+            "minimum": 1,
+            "title": "Max Iter",
+            "type": "integer"
+          }
+        },
+        "title": "LassoParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "alpha": [
+          0.001,
+          0.01,
+          0.1,
+          1
+        ]
+      }
+    },
+    {
+      "description": "Ordinary least squares, without regularisation.",
+      "id": "linear_regression",
+      "kind": "model",
+      "label": "Linear regression",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``linear_regression``.",
+        "properties": {
+          "fit_intercept": {
+            "default": true,
+            "description": "Fit an intercept term.",
+            "title": "Fit Intercept",
+            "type": "boolean"
+          }
+        },
+        "title": "LinearRegressionParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "fit_intercept": [
+          true,
+          false
+        ]
+      }
+    },
+    {
+      "description": "A linear classifier with L2 regularisation.",
+      "id": "logistic_regression",
+      "kind": "model",
+      "label": "Logistic regression",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``logistic_regression``.",
+        "properties": {
+          "C": {
+            "default": 1.0,
+            "description": "Inverse regularisation strength.",
+            "exclusiveMinimum": 0,
+            "title": "C",
+            "type": "number"
+          },
+          "fit_intercept": {
+            "default": true,
+            "description": "Fit an intercept term.",
+            "title": "Fit Intercept",
+            "type": "boolean"
+          },
+          "max_iter": {
+            "default": 1000,
+            "description": "Maximum iterations.",
+            "maximum": 10000,
+            "minimum": 100,
+            "title": "Max Iter",
+            "type": "integer"
+          }
+        },
+        "title": "LogisticRegressionParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "C": [
+          0.01,
+          0.1,
+          1,
+          10
+        ],
+        "fit_intercept": [
+          true,
+          false
+        ]
+      }
+    },
+    {
+      "description": "A multi-layer perceptron classifier.",
+      "id": "mlp_classifier",
+      "kind": "model",
+      "label": "Neural network",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``mlp_classifier`` and ``mlp_regressor``.",
+        "properties": {
+          "activation": {
+            "default": "relu",
+            "description": "Hidden layer activation function.",
+            "enum": [
+              "identity",
+              "logistic",
+              "tanh",
+              "relu"
+            ],
+            "title": "Activation",
+            "type": "string"
+          },
+          "alpha": {
+            "default": 0.0001,
+            "description": "L2 regularisation strength.",
+            "minimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "hidden_layer_sizes": {
+            "default": [
+              100
+            ],
+            "description": "Neurons in each hidden layer, 1 to 5 layers.",
+            "items": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Hidden Layer Sizes",
+            "type": "array"
+          },
+          "learning_rate_init": {
+            "default": 0.001,
+            "description": "Initial learning rate.",
+            "exclusiveMinimum": 0,
+            "title": "Learning Rate Init",
+            "type": "number"
+          },
+          "max_iter": {
+            "default": 500,
+            "description": "Maximum epochs.",
+            "maximum": 5000,
+            "minimum": 50,
+            "title": "Max Iter",
+            "type": "integer"
+          }
+        },
+        "title": "MlpParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "alpha": [
+          0.0001,
+          0.001,
+          0.01
+        ],
+        "hidden_layer_sizes": [
+          [
+            50
+          ],
+          [
+            100
+          ],
+          [
+            100,
+            50
+          ]
+        ]
+      }
+    },
+    {
+      "description": "A multi-layer perceptron regressor.",
+      "id": "mlp_regressor",
+      "kind": "model",
+      "label": "Neural network",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``mlp_classifier`` and ``mlp_regressor``.",
+        "properties": {
+          "activation": {
+            "default": "relu",
+            "description": "Hidden layer activation function.",
+            "enum": [
+              "identity",
+              "logistic",
+              "tanh",
+              "relu"
+            ],
+            "title": "Activation",
+            "type": "string"
+          },
+          "alpha": {
+            "default": 0.0001,
+            "description": "L2 regularisation strength.",
+            "minimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "hidden_layer_sizes": {
+            "default": [
+              100
+            ],
+            "description": "Neurons in each hidden layer, 1 to 5 layers.",
+            "items": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Hidden Layer Sizes",
+            "type": "array"
+          },
+          "learning_rate_init": {
+            "default": 0.001,
+            "description": "Initial learning rate.",
+            "exclusiveMinimum": 0,
+            "title": "Learning Rate Init",
+            "type": "number"
+          },
+          "max_iter": {
+            "default": 500,
+            "description": "Maximum epochs.",
+            "maximum": 5000,
+            "minimum": 50,
+            "title": "Max Iter",
+            "type": "integer"
+          }
+        },
+        "title": "MlpParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "alpha": [
+          0.0001,
+          0.001,
+          0.01
+        ],
+        "hidden_layer_sizes": [
+          [
+            50
+          ],
+          [
+            100
+          ],
+          [
+            100,
+            50
+          ]
+        ]
+      }
+    },
+    {
+      "description": "An ensemble of decision trees, each fitted on a bootstrap sample.",
+      "id": "random_forest_classifier",
+      "kind": "model",
+      "label": "Random forest",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``random_forest_classifier`` and ``random_forest_regressor``.",
+        "properties": {
+          "max_depth": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum tree depth; empty for no limit.",
+            "title": "Max Depth"
+          },
+          "min_samples_leaf": {
+            "default": 1,
+            "description": "Minimum samples in a leaf.",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Min Samples Leaf",
+            "type": "integer"
+          },
+          "min_samples_split": {
+            "default": 2,
+            "description": "Minimum samples to split a node.",
+            "maximum": 50,
+            "minimum": 2,
+            "title": "Min Samples Split",
+            "type": "integer"
+          },
+          "n_estimators": {
+            "default": 100,
+            "description": "Number of trees.",
+            "maximum": 1000,
+            "minimum": 10,
+            "title": "N Estimators",
+            "type": "integer"
+          }
+        },
+        "title": "RandomForestParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "max_depth": [
+          null,
+          10,
+          20,
+          30
+        ],
+        "min_samples_split": [
+          2,
+          5,
+          10
+        ],
+        "n_estimators": [
+          10,
+          50,
+          100,
+          200
+        ]
+      }
+    },
+    {
+      "description": "An ensemble of decision trees, each fitted on a bootstrap sample.",
+      "id": "random_forest_regressor",
+      "kind": "model",
+      "label": "Random forest",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``random_forest_classifier`` and ``random_forest_regressor``.",
+        "properties": {
+          "max_depth": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum tree depth; empty for no limit.",
+            "title": "Max Depth"
+          },
+          "min_samples_leaf": {
+            "default": 1,
+            "description": "Minimum samples in a leaf.",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Min Samples Leaf",
+            "type": "integer"
+          },
+          "min_samples_split": {
+            "default": 2,
+            "description": "Minimum samples to split a node.",
+            "maximum": 50,
+            "minimum": 2,
+            "title": "Min Samples Split",
+            "type": "integer"
+          },
+          "n_estimators": {
+            "default": 100,
+            "description": "Number of trees.",
+            "maximum": 1000,
+            "minimum": 10,
+            "title": "N Estimators",
+            "type": "integer"
+          }
+        },
+        "title": "RandomForestParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "max_depth": [
+          null,
+          10,
+          20,
+          30
+        ],
+        "min_samples_split": [
+          2,
+          5,
+          10
+        ],
+        "n_estimators": [
+          10,
+          50,
+          100,
+          200
+        ]
+      }
+    },
+    {
+      "description": "Linear regression with L2 regularisation.",
+      "id": "ridge",
+      "kind": "model",
+      "label": "Ridge regression",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``ridge``.",
+        "properties": {
+          "alpha": {
+            "default": 1.0,
+            "description": "L2 regularisation strength.",
+            "minimum": 0,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "fit_intercept": {
+            "default": true,
+            "description": "Fit an intercept term.",
+            "title": "Fit Intercept",
+            "type": "boolean"
+          }
+        },
+        "title": "RidgeParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "alpha": [
+          0.01,
+          0.1,
+          1,
+          10
+        ]
+      }
+    },
+    {
+      "description": "A kernel support vector classifier, with probability estimates.",
+      "id": "svc",
+      "kind": "model",
+      "label": "Support vector machine",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``svc`` and ``svr``.",
+        "properties": {
+          "C": {
+            "default": 1.0,
+            "description": "Inverse regularisation strength.",
+            "exclusiveMinimum": 0,
+            "title": "C",
+            "type": "number"
+          },
+          "degree": {
+            "default": 3,
+            "description": "Degree of the poly kernel.",
+            "maximum": 5,
+            "minimum": 2,
+            "title": "Degree",
+            "type": "integer"
+          },
+          "gamma": {
+            "default": "scale",
+            "description": "Kernel coefficient for rbf, poly and sigmoid.",
+            "enum": [
+              "scale",
+              "auto"
+            ],
+            "title": "Gamma",
+            "type": "string"
+          },
+          "kernel": {
+            "default": "rbf",
+            "description": "Kernel function.",
+            "enum": [
+              "linear",
+              "poly",
+              "rbf",
+              "sigmoid"
+            ],
+            "title": "Kernel",
+            "type": "string"
+          }
+        },
+        "title": "SvmParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "C": [
+          0.1,
+          1.0,
+          10.0
+        ],
+        "degree": [
+          2,
+          3,
+          4
+        ],
+        "kernel": [
+          "linear",
+          "poly",
+          "rbf"
+        ]
+      }
+    },
+    {
+      "description": "A kernel support vector regressor.",
+      "id": "svr",
+      "kind": "model",
+      "label": "Support vector machine",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``svc`` and ``svr``.",
+        "properties": {
+          "C": {
+            "default": 1.0,
+            "description": "Inverse regularisation strength.",
+            "exclusiveMinimum": 0,
+            "title": "C",
+            "type": "number"
+          },
+          "degree": {
+            "default": 3,
+            "description": "Degree of the poly kernel.",
+            "maximum": 5,
+            "minimum": 2,
+            "title": "Degree",
+            "type": "integer"
+          },
+          "gamma": {
+            "default": "scale",
+            "description": "Kernel coefficient for rbf, poly and sigmoid.",
+            "enum": [
+              "scale",
+              "auto"
+            ],
+            "title": "Gamma",
+            "type": "string"
+          },
+          "kernel": {
+            "default": "rbf",
+            "description": "Kernel function.",
+            "enum": [
+              "linear",
+              "poly",
+              "rbf",
+              "sigmoid"
+            ],
+            "title": "Kernel",
+            "type": "string"
+          }
+        },
+        "title": "SvmParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "C": [
+          0.1,
+          1.0,
+          10.0
+        ],
+        "degree": [
+          2,
+          3,
+          4
+        ],
+        "kernel": [
+          "linear",
+          "poly",
+          "rbf"
+        ]
+      }
+    },
+    {
+      "description": "Gradient-boosted decision trees.",
+      "id": "xgboost_classifier",
+      "kind": "model",
+      "label": "XGBoost",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``xgboost_classifier`` and ``xgboost_regressor``.",
+        "properties": {
+          "learning_rate": {
+            "default": 0.3,
+            "description": "Step size shrinkage.",
+            "maximum": 1,
+            "minimum": 0.001,
+            "title": "Learning Rate",
+            "type": "number"
+          },
+          "max_depth": {
+            "default": 6,
+            "description": "Maximum tree depth.",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Max Depth",
+            "type": "integer"
+          },
+          "n_estimators": {
+            "default": 100,
+            "description": "Number of boosting rounds.",
+            "maximum": 2000,
+            "minimum": 10,
+            "title": "N Estimators",
+            "type": "integer"
+          },
+          "subsample": {
+            "default": 1.0,
+            "description": "Share of rows sampled for each tree.",
+            "maximum": 1,
+            "minimum": 0.1,
+            "title": "Subsample",
+            "type": "number"
+          }
+        },
+        "title": "XGBoostParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "classification"
+      ],
+      "search_grid": {
+        "learning_rate": [
+          0.01,
+          0.1,
+          0.3
+        ],
+        "max_depth": [
+          3,
+          5,
+          7,
+          9
+        ],
+        "n_estimators": [
+          10,
+          50,
+          100,
+          200
+        ],
+        "subsample": [
+          0.5,
+          0.8,
+          1.0
+        ]
+      }
+    },
+    {
+      "description": "Gradient-boosted decision trees.",
+      "id": "xgboost_regressor",
+      "kind": "model",
+      "label": "XGBoost",
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Parameters for ``xgboost_classifier`` and ``xgboost_regressor``.",
+        "properties": {
+          "learning_rate": {
+            "default": 0.3,
+            "description": "Step size shrinkage.",
+            "maximum": 1,
+            "minimum": 0.001,
+            "title": "Learning Rate",
+            "type": "number"
+          },
+          "max_depth": {
+            "default": 6,
+            "description": "Maximum tree depth.",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Max Depth",
+            "type": "integer"
+          },
+          "n_estimators": {
+            "default": 100,
+            "description": "Number of boosting rounds.",
+            "maximum": 2000,
+            "minimum": 10,
+            "title": "N Estimators",
+            "type": "integer"
+          },
+          "subsample": {
+            "default": 1.0,
+            "description": "Share of rows sampled for each tree.",
+            "maximum": 1,
+            "minimum": 0.1,
+            "title": "Subsample",
+            "type": "number"
+          }
+        },
+        "title": "XGBoostParams",
+        "type": "object"
+      },
+      "problem_types": [
+        "regression"
+      ],
+      "search_grid": {
+        "learning_rate": [
+          0.01,
+          0.1,
+          0.3
+        ],
+        "max_depth": [
+          3,
+          5,
+          7,
+          9
+        ],
+        "n_estimators": [
+          10,
+          50,
+          100,
+          200
+        ],
+        "subsample": [
+          0.5,
+          0.8,
+          1.0
+        ]
+      }
+    }
+  ]
+}

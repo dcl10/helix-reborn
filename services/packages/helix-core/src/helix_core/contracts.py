@@ -1,9 +1,9 @@
-"""Generate JSON Schemas for the message and model-metadata contracts.
+"""Generate the contract files shared with the API and the web app.
 
-The schemas under ``contracts/`` are generated, not hand-written: they are the JSON
-Schema form of the pydantic models in :mod:`helix_core.messages` and
-:mod:`helix_core.model_metadata`, which are the source of truth. #22 extends
-:func:`build_schemas` with the pipeline catalog schema, via the same registry pattern.
+Everything under ``contracts/`` is generated, not hand-written: the JSON Schema form of
+the pydantic models in :mod:`helix_core.messages` and :mod:`helix_core.model_metadata`,
+and the pipeline catalog from :func:`helix_core.pipelines.catalog`. Python is the
+source of truth.
 """
 
 import argparse
@@ -15,6 +15,7 @@ from typing import Any
 
 from helix_core.messages import EvaluationJob, JobEvent, PipelineSpec, TrainingJob
 from helix_core.model_metadata import ModelMetadata
+from helix_core.pipelines import catalog
 
 _MESSAGE_SCHEMA_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
     "training-job": TrainingJob.model_json_schema,
@@ -27,23 +28,28 @@ _TOP_LEVEL_SCHEMA_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
     "model-metadata": ModelMetadata.model_json_schema,
 }
 
+_DOCUMENT_BUILDERS: dict[str, Callable[[], dict[str, Any]]] = {
+    "pipeline-catalog": catalog,
+}
+"""Generated documents that aren't JSON Schemas: ``contracts/<name>.json``."""
+
 
 def build_schemas() -> dict[str, dict[str, Any]]:
-    """Build the JSON Schema for every registered message and top-level contract.
+    """Build every contract: the message and top-level schemas, and the catalog.
 
     Returns:
-        A mapping of schema name (e.g. ``"training-job"``, ``"model-metadata"``) to
-        its JSON Schema.
+        A mapping of contract name (e.g. ``"training-job"``, ``"model-metadata"``,
+        ``"pipeline-catalog"``) to its content.
     """
-    return {
-        name: builder()
-        for name, builder in (
-            _MESSAGE_SCHEMA_BUILDERS | _TOP_LEVEL_SCHEMA_BUILDERS
-        ).items()
-    }
+    builders = (
+        _MESSAGE_SCHEMA_BUILDERS | _TOP_LEVEL_SCHEMA_BUILDERS | _DOCUMENT_BUILDERS
+    )
+    return {name: builder() for name, builder in builders.items()}
 
 
 def _schema_path(root: Path, name: str) -> Path:
+    if name in _DOCUMENT_BUILDERS:
+        return root / "contracts" / f"{name}.json"
     if name in _TOP_LEVEL_SCHEMA_BUILDERS:
         return root / "contracts" / f"{name}.schema.json"
     return root / "contracts" / "messages" / f"{name}.schema.json"
@@ -54,13 +60,17 @@ def _render(schema: dict[str, Any]) -> str:
 
 
 def export(root: Path) -> list[Path]:
-    """Write every schema to ``<root>/contracts/messages/<name>.schema.json``.
+    """Write every contract under ``<root>/contracts/``.
+
+    Message schemas go to ``messages/<name>.schema.json``, top-level schemas to
+    ``<name>.schema.json`` and other documents (the pipeline catalog) to
+    ``<name>.json``.
 
     Args:
         root: The repository root the ``contracts/`` directory lives under.
 
     Returns:
-        The paths written, one per schema.
+        The paths written, one per contract.
     """
     paths = []
     for name, schema in build_schemas().items():
