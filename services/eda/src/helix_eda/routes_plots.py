@@ -18,15 +18,19 @@ from helix_core.storage import Storage
 from helix_eda.dependencies import get_storage, require_service_token
 from helix_eda.plots import (
     create_pairplot,
+    pca_plot,
     plot_correlation_heatmap,
     plot_target_variable_distribution,
+    tsne_plot,
 )
 from helix_eda.schemas import (
     CorrelationHeatmapRequest,
     PairplotRequest,
+    PcaRequest,
     PlotRequest,
     PlotResponse,
     TargetDistributionRequest,
+    TsneRequest,
 )
 
 router = APIRouter(prefix="/plots", dependencies=[Depends(require_service_token)])
@@ -103,4 +107,40 @@ def post_pairplot(
     """
     df = load_csv(storage, body.dataset_key)
     fig, title = create_pairplot(df, body)
+    return _upload_plot(storage, body, fig, title)
+
+
+@router.post("/pca", response_model=PlotResponse)
+def post_pca(
+    body: PcaRequest, storage: Annotated[Storage, Depends(get_storage)]
+) -> PlotResponse:
+    """Plot a 2D PCA scatter of the requested columns and upload it to S3.
+
+    Args:
+        body: The request body, naming the dataset, columns and output key.
+        storage: The storage client to read the dataset from and write the plot to.
+
+    Returns:
+        The uploaded plot's key, content type, size and title.
+    """
+    df = load_csv(storage, body.dataset_key)
+    fig, title = pca_plot(df, body)
+    return _upload_plot(storage, body, fig, title)
+
+
+@router.post("/tsne", response_model=PlotResponse)
+def post_tsne(
+    body: TsneRequest, storage: Annotated[Storage, Depends(get_storage)]
+) -> PlotResponse:
+    """Plot a 2D t-SNE scatter of the requested columns and upload it to S3.
+
+    Args:
+        body: The request body, naming the dataset, columns, perplexity and output key.
+        storage: The storage client to read the dataset from and write the plot to.
+
+    Returns:
+        The uploaded plot's key, content type, size and title.
+    """
+    df = load_csv(storage, body.dataset_key)
+    fig, title = tsne_plot(df, body)
     return _upload_plot(storage, body, fig, title)

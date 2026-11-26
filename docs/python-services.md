@@ -135,6 +135,9 @@ Keycloak itself — it only validates tokens the API already obtained.
 | `POST /plots/target-distribution` | service token | `{"dataset_key", "output_key", "target_column", "show_kde", "bins", "plot_options"}` | a PNG's key, content type, size and title |
 | `POST /plots/correlation-heatmap` | service token | `{"dataset_key", "output_key", "columns", "method", "annotate", "plot_options"}` | a PNG's key, content type, size and title |
 | `POST /plots/pairplot` | service token | `{"dataset_key", "output_key", "columns", "hue_column", "corner", "diag_kind", "plot_options"}` | a PNG's key, content type, size and title |
+| `POST /plots/pca` | service token | `{"dataset_key", "output_key", "columns", "colour_column", "scaling", "plot_options"}` | a PNG's key, content type, size and title |
+| `POST /plots/tsne` | service token | `{"dataset_key", "output_key", "columns", "colour_column", "scaling", "perplexity", "plot_options"}` | a PNG's key, content type, size and title |
+| `POST /tables/normality` | service token | `{"dataset_key", "output_key", "columns"}` | a CSV's key, content type, size, title and the per-column test rows |
 
 Every route but `/health` sits behind `helix_eda.dependencies.require_service_token`, which expects an
 `Authorization: Bearer <token>` header and validates it with `helix_core.auth.JwtValidator` (built from
@@ -164,6 +167,23 @@ rendering in its threadpool.
   annotations only when there are at most 20 columns.
 - `pairplot`: a seaborn pairplot over 2-10 numeric `columns`, with an optional `hue_column`, `corner` and `diag_kind`.
   Datasets over 2000 rows are sampled to 2000 (`random_state=42`), noted in the title.
+- `pca`: a 2D scatter of the first two principal components (`sklearn.decomposition.PCA`,
+  `n_components=2, random_state=42`) over `columns` (default: all numeric, min 2), scaled first per `scaling`
+  (`standard`/`minmax`/`none`). Rows with a NaN in `columns` or `colour_column` are dropped before fitting. Axis
+  labels include the explained variance, e.g. `"PC1 (43.2%)"`. `colour_column` colours points with a continuous
+  colormap (numeric) or a categorical legend (otherwise).
+- `tsne`: the same scatter, but with `sklearn.manifold.TSNE` (`n_components=2, random_state=42, init="pca"`, plus
+  `perplexity`, 5-100, default 30). Datasets over 5000 rows (after dropping NaNs) are sampled to 5000
+  (`random_state=42`), noted in the title; `perplexity` must be less than the row count after sampling, or the
+  request gets `422`.
+
+`helix_eda.stats.normality_table` runs Shapiro-Wilk and Kolmogorov-Smirnov (against a normal distribution fitted to
+the column with `scipy.stats.norm.fit`) on each numeric column (default: all numeric), ported from the original
+Helix's `statistical_tests.py`. Columns with fewer than 3 non-null values are skipped; Shapiro-Wilk runs on at most
+5000 values (sampled with `random_state=42`). `helix_eda.routes_tables` loads the dataset, calls it, writes the
+result as a CSV to S3 (`text/csv`, `output_key` must end `.csv`, else `422`) and returns its key, content type,
+size, title and rows (`column`, `n`, `shapiro_statistic`, `shapiro_p`, `ks_statistic`, `ks_p`, and `normal_at_0_05`,
+true when both p-values exceed 0.05).
 
 Shared rendering helpers live in `helix_core.plotting` (used by the evaluation worker too): `use_headless_backend`
 forces matplotlib's `Agg` backend (no display in a container); `apply_style` applies a `PlotOptions`' seaborn theme

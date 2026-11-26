@@ -12,6 +12,7 @@ from helix_core.settings import get_settings
 from helix_core.storage import Storage
 from helix_eda.dependencies import get_storage, require_service_token
 from helix_eda.routes_plots import router as plots_router
+from helix_eda.routes_tables import router as tables_router
 from helix_eda.schemas import DatasetSummary, SummaryRequest
 from helix_eda.summary import summarise
 
@@ -74,4 +75,5 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(plots_router)
+    app.include_router(tables_router)
     return app
