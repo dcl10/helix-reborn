@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
+using Services.Eda;
 using Services.Keycloak;
 using Services.Storage;
 
@@ -39,6 +40,9 @@ public class ApiFactory : WebApplicationFactory<Program>
 
   /// <summary>The fake object store the app uses, shared by every request to this factory's host.</summary>
   public InMemoryObjectStorage ObjectStorage { get; } = new();
+
+  /// <summary>The fake EDA service client the app uses, shared by every request to this factory's host.</summary>
+  public FakeEdaClient Eda { get; } = new();
 
   private readonly string _serverConnection;
   private readonly string _databaseName = $"helix_test_{Guid.NewGuid():N}";
@@ -79,6 +83,10 @@ public class ApiFactory : WebApplicationFactory<Program>
       // Tests never call a real S3-compatible store.
       services.RemoveAll<IObjectStorage>();
       services.AddSingleton<IObjectStorage>(ObjectStorage);
+
+      // Tests never call a real EDA service.
+      services.RemoveAll<IEdaClient>();
+      services.AddSingleton<IEdaClient>(Eda);
     });
 
     builder.ConfigureServices(services =>
