@@ -17,9 +17,10 @@ api/
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
     Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options, EdaOptions,
-                                 ContractsOptions)
+                                 ContractsOptions, RabbitMqOptions)
     Controllers/                 one per resource, thin
     Filters/                     MVC filters (RejectOversizedUploadAttribute)
+    Messaging/                   RabbitMQ: queue topology, job messages, publisher, jobs.events consumer
     Models/                      request/response types
     Data/                        AppDbContext, design-time factory, migrations
     Health/                      /health response writer
@@ -29,6 +30,7 @@ api/
       Eda/                       IEdaService, EdaService; IEdaClient, EdaClient over the EDA service; their exceptions
       Pipelines/                 IPipelineCatalog (contracts/pipeline-catalog.json), PipelineSpec, PipelineSpecValidator,
                                  IPipelineService, PipelineService and their exceptions
+      Runs/                      IRunService, RunService, RunEventHandler (training job events)
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
       Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
       Storage/                   IObjectStorage, S3ObjectStorage, StorageKeys
@@ -66,6 +68,9 @@ first use.
   path is looked for in the content root and each parent, then the app's base directory and each parent, so the repo's
   own `contracts/` is found from `dotnet run` and tests. The Docker image copies `contracts/` to `/app/contracts` and
   sets `Contracts__Root` to it. See [Pipelines](#pipelines).
+- **`RabbitMq`** (`RabbitMqOptions`) — `Url`, an `amqp://` or `amqps://` URL with credentials. The default is the local
+  Compose broker (`amqp://helix:dev_password@localhost:5672/`); set `RabbitMq__Url` everywhere else. See
+  [Training runs](#training-runs).
 
 ## Auth
 
@@ -276,6 +281,84 @@ Tests: `PipelineCatalogTests` and `PipelineSpecValidatorTests` use the repo's re
 the app finds it. `PipelinesControllerTests` covers the endpoints, and `PipelineCatalogStartupTests` checks that the
 app won't start without a catalog.
 
+## Training runs
+
+Running a pipeline creates a **run**. The API snapshots the pipeline's name and spec, stores a `Queued` run, and
+publishes a `TrainingJob` to `training.jobs`. The training worker (`services/training`, see
+[pipelines.md](pipelines.md#training)) publishes job events to `jobs.events`, and the API applies them to the run.
+Reads are for the owner or `helix-admin`; only the owner can start a run.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `POST` | `/api/experiments/{id}/pipelines/{pipelineId}/runs` | Re-validates the spec against the current dataset and catalog, stores a `Queued` run and publishes its job. `202` with the run and `Location`. |
+| `GET` | `/api/experiments/{id}/runs` | The experiment's runs, newest first. |
+| `GET` | `/api/experiments/{id}/runs/{runId}` | One run. |
+| `GET` | `/api/experiments/{id}/runs/{runId}/events` | Server-sent events: `status` with the run (camelCase) now and whenever it changes, then `end` (`{"status"}`) once it's succeeded or failed, and the stream closes. |
+
+A `RunResponse` is `{"id", "pipelineId", "pipelineName", "status", "progress", "message", "result", "error",
+"spec", "createdAt", "startedAt", "finishedAt"}`:
+
+- `status` is `queued`, `running`, `succeeded` or `failed`.
+- `result` is the worker's `succeeded` result (`model_key`, `metadata_key`, `split_key`, `cv_metrics_key`,
+  `cv_metrics`, `best_params`, `train_rows`, `test_rows`). Like `spec`, it's snake_case, as stored.
+- `error` is `{"type", "message"}`.
+- `pipelineId` becomes null if the pipeline is deleted. The run keeps its own snapshot.
+
+Errors:
+
+| Cause | Response |
+| --- | --- |
+| Experiment, pipeline or run missing or not visible, or an admin starting a run | `404` |
+| No dataset | `409` |
+| The spec no longer fits the dataset or catalog | `400` `ValidationProblemDetails`, `errors.spec` |
+| The job couldn't be published (RabbitMQ down, not confirmed within 10 s) | `503`; the run is stored as `failed` with error type `QueueUnavailable` |
+
+**Publishing.** `TrainingJob` values:
+
+- `dataset_key`: the dataset's storage key.
+- `output_prefix`: `StorageKeys.RunPrefix(e, r)` (`experiments/{e}/runs/{r}/`).
+- `job_id`: a new ID, stored as the run's `JobId`.
+- `pipeline`: the stored spec JSON, as is.
+
+`RabbitMqJobPublisher` opens a channel per publish with publisher confirms, and publishes to the default exchange
+with routing key `training.jobs`, persistent, `application/json`, `message_id` = `job_id`, and `mandatory`, so an
+unroutable job fails instead of vanishing. `RabbitMqConnection` is the one long-lived connection, opened lazily and
+again after it drops. It declares the topology on every new connection (`Messaging/Queues.cs`, the same arguments as
+helix-core's).
+
+**Consuming events.** `JobEventConsumer`, a `BackgroundService`, consumes `jobs.events`:
+
+- Manual acks, prefetch 20.
+- Each event goes to the `IJobEventHandler` whose `JobType` matches, in a fresh DI scope. Evaluation events have no
+  handler until #34, so they're logged and acked.
+- An unreadable event is logged and acked. A handler exception is nacked with requeue after a second.
+- If RabbitMQ is down it retries with backoff (1 s doubling to 30 s), so the API starts and serves requests without
+  it. RabbitMQ.Client's own automatic recovery is off, so a reconnect can't leave two consumers.
+
+`RunEventHandler` (training) finds the run by `entity_id` and applies the event:
+
+| Event | Effect |
+| --- | --- |
+| `started` | `Running`, `StartedAt` |
+| `progress` | `Progress` and `Message`. Also `Running` and `StartedAt`, in case it arrived before `started` |
+| `succeeded` | `Succeeded`, `Progress` 1, the result, `FinishedAt`. Records `model.onnx` (`model`), `metadata.json` (`modelMetadata`), `split.json` (`split`) and, if present, `cv_metrics.json` (`cvMetrics`) as artifacts with `sourceType` `"run"` and `sourceId` the run, using the sizes from `IObjectStorage.ListAsync` of the run's prefix |
+| `failed` | `Failed`, the error's type and message, `FinishedAt` |
+
+Events can arrive twice or out of order, so handling is idempotent:
+
+- An event is ignored for an unknown run, for another job ID, or once the run is `Succeeded` or `Failed`.
+- On `succeeded`, the files are recorded before the run turns terminal, skipping any already recorded. So a
+  redelivered event finishes the job without duplicating artifacts.
+
+**Following a run.** The SSE endpoint uses `TypedResults.ServerSentEvents`. `RunService.FollowAsync` checks access
+first, so a 404 comes back as a problem rather than an empty stream. It then polls the run every second in a fresh DI
+scope (never holding a `DbContext` for the whole stream) and yields it whenever its status, progress, message,
+timestamps or error change.
+
+Tests replace `IJobPublisher` with `FakeJobPublisher` (records jobs; `FailFor` makes one experiment's publishes throw)
+and don't run `JobEventConsumer`. `RunEventHandlerTests` call the handler directly, and the SSE tests parse the stream
+with `Fixtures/Sse.cs`.
+
 ## Running it
 
 ```bash
@@ -292,8 +375,8 @@ run the EDA service too (`cd services && uv run helix-eda`, port 8000) and start
 ## Migrations
 
 The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table and
-`AddExperiments` the `Experiments` and `Datasets` tables, `AddArtifacts` the `Artifacts` table, and `AddPipelines` the
-`Pipelines` table; further domain entities are added by later issues.
+`AddExperiments` the `Experiments` and `Datasets` tables, `AddArtifacts` the `Artifacts` table, `AddPipelines` the
+`Pipelines` table, and `AddRuns` the `Runs` table; further domain entities are added by later issues.
 
 ```bash
 cd api

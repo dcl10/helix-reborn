@@ -23,6 +23,9 @@ builder.Services.AddEda(builder.Configuration);
 // Pipelines: the step catalog from contracts/pipeline-catalog.json, and saved, validated pipeline specs.
 builder.Services.AddPipelines();
 
+// Training runs: TrainingJobs published to RabbitMQ, and the workers' events consumed from jobs.events.
+builder.Services.AddRuns();
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

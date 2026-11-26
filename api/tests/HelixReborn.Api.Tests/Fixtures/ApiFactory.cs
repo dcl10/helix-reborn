@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
+using Messaging;
 using Services.Eda;
 using Services.Keycloak;
 using Services.Storage;
@@ -43,6 +44,9 @@ public class ApiFactory : WebApplicationFactory<Program>
 
   /// <summary>The fake EDA service client the app uses, shared by every request to this factory's host.</summary>
   public FakeEdaClient Eda { get; } = new();
+
+  /// <summary>The fake job publisher the app uses, shared by every request to this factory's host.</summary>
+  public FakeJobPublisher Jobs { get; } = new();
 
   private readonly string _serverConnection;
   private readonly string _databaseName = $"helix_test_{Guid.NewGuid():N}";
@@ -87,6 +91,13 @@ public class ApiFactory : WebApplicationFactory<Program>
       // Tests never call a real EDA service.
       services.RemoveAll<IEdaClient>();
       services.AddSingleton<IEdaClient>(Eda);
+
+      // Tests never use a real RabbitMQ: publish to the fake, and don't consume jobs.events (tests call the
+      // IJobEventHandler directly).
+      services.RemoveAll<IJobPublisher>();
+      services.AddSingleton<IJobPublisher>(Jobs);
+      var consumer = services.Single(d => d.ImplementationType == typeof(JobEventConsumer));
+      services.Remove(consumer);
     });
 
     builder.ConfigureServices(services =>
