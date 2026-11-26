@@ -11,6 +11,7 @@ from helix_core.logging import configure_logging
 from helix_core.settings import get_settings
 from helix_core.storage import Storage
 from helix_eda.dependencies import get_storage, require_service_token
+from helix_eda.routes_plots import router as plots_router
 from helix_eda.schemas import DatasetSummary, SummaryRequest
 from helix_eda.summary import summarise
 
@@ -72,4 +73,5 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
     app.include_router(router)
+    app.include_router(plots_router)
     return app

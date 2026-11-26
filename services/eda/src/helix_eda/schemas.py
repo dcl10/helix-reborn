@@ -58,7 +58,9 @@ class CorrelationHeatmapRequest(PlotRequest):
     method: Literal["pearson", "spearman", "kendall"] = Field(
         "pearson", description="Correlation method."
     )
-    annotate: bool = Field(True, description="Show coefficients, if 20 columns or fewer.")
+    annotate: bool = Field(
+        True, description="Show coefficients, if 20 columns or fewer."
+    )
 
 
 class PairplotRequest(PlotRequest):

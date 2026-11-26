@@ -58,9 +58,7 @@ def plot_target_variable_distribution(
     series = df[request.target_column]
     title = f"Target distribution: {request.target_column}"
     if pd.api.types.is_numeric_dtype(series):
-        sns.histplot(
-            series.dropna(), bins=request.bins, kde=request.show_kde, ax=ax
-        )
+        sns.histplot(series.dropna(), bins=request.bins, kde=request.show_kde, ax=ax)
         y_label = "Frequency"
     else:
         counts = series.value_counts()

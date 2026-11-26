@@ -10,13 +10,13 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt  # noqa: E402
-import seaborn as sns  # noqa: E402
-from matplotlib.axes import Axes  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
-from helix_core.messages import PlotOptions  # noqa: E402
-from helix_core.storage import Storage  # noqa: E402
+from helix_core.messages import PlotOptions
+from helix_core.storage import Storage
 
 
 def use_headless_backend() -> None:
