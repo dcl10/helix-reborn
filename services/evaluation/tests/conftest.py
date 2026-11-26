@@ -67,9 +67,7 @@ def _train_and_upload(
             }
         ),
     )
-    output = train(
-        training_job, df, n_jobs=1, version="test", progress=lambda *_: None
-    )
+    output = train(training_job, df, n_jobs=1, version="test", progress=lambda *_: None)
 
     storage.put_bytes(dataset_key, df.to_csv(index=False).encode("utf-8"), "text/csv")
     storage.put_bytes(
@@ -100,7 +98,9 @@ def _train_and_upload(
 @pytest.fixture
 def classification_env(s3_storage: Storage):
     df = _classification_df()
-    job, output = _train_and_upload(s3_storage, "classification", df, "logistic_regression")
+    job, output = _train_and_upload(
+        s3_storage, "classification", df, "logistic_regression"
+    )
     return s3_storage, job, df, output
 
 
