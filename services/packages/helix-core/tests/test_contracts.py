@@ -31,7 +31,9 @@ def test_export_writes_model_metadata_at_the_top_level_of_contracts(
 
     model_metadata_path = tmp_path / "contracts" / "model-metadata.schema.json"
     assert model_metadata_path in paths
-    assert not (tmp_path / "contracts" / "messages" / "model-metadata.schema.json").exists()
+    assert not (
+        tmp_path / "contracts" / "messages" / "model-metadata.schema.json"
+    ).exists()
 
 
 def test_find_repo_root_finds_the_real_repo_root() -> None:

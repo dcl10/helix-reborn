@@ -49,7 +49,9 @@ def test_model_metadata_rejects_extra_field() -> None:
 
 
 def test_model_metadata_classes_is_none_for_regression() -> None:
-    metadata = _metadata(problem_type="regression", classes=None, onnx_outputs={"value": "variable"})
+    metadata = _metadata(
+        problem_type="regression", classes=None, onnx_outputs={"value": "variable"}
+    )
 
     assert metadata.classes is None
 
