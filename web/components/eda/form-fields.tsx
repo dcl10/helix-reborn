@@ -233,7 +233,7 @@ export function ColumnChecklist<T extends FieldValues>({
           <FieldSet data-invalid={fieldState.invalid}>
             <FieldLegend variant="label">{label}</FieldLegend>
             {description && <FieldDescription>{description}</FieldDescription>}
-            <ScrollArea className="max-h-48 rounded-lg border">
+            <ScrollArea className="rounded-lg border *:data-[slot=scroll-area-viewport]:max-h-48">
               <div className="flex flex-col gap-2 p-3">
                 {columns.map((column) => {
                   const id = `${name}-${column}`;
