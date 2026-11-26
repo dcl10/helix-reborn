@@ -25,11 +25,11 @@ services/
     pyproject.toml
     src/helix_training/
     tests/
-  evaluation/                   aio-pika worker (added by #28)
+  evaluation/                   aio-pika worker (package helix-evaluation; see evaluation.md)
+    pyproject.toml
+    src/helix_evaluation/
+    tests/
 ```
-
-`evaluation` is added to `[tool.uv.workspace].members` and `[tool.pytest.ini_options].testpaths` by the issue that
-creates it.
 
 ### helix-core vs a service
 
