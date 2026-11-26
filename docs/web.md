@@ -117,9 +117,9 @@ For code in `web/`:
   `ExperimentHeader`, above `children` (the active tab).
 - **`app/(app)/experiments/[id]/page.tsx`** redirects to the Data tab; #38 replaces this with an overview.
 - **`app/(app)/experiments/[id]/data/page.tsx`** renders `DatasetOverview`, **`eda/page.tsx`** the EDA tab
-  ([below](#eda-tab)) and **`pipelines/…`** the Pipelines tab ([below](#pipelines)). The other four tab pages (`runs`,
-  `evaluations`, `predict`, `files`) are "Coming soon" placeholders until their own issues (#27, #35, #37, #38) build
-  them out.
+  ([below](#eda-tab)), **`pipelines/…`** the Pipelines tab ([below](#pipelines)) and **`runs/…`** the Runs tab
+  ([below](#runs)). The other three tab pages (`evaluations`, `predict`, `files`) are "Coming soon" placeholders until
+  their own issues (#35, #37, #38) build them out.
 - **`components/experiments/experiment-header.tsx`** (`ExperimentHeader`) shows the experiment's name and
   description, `EditExperimentDialog` (PATCH) and `DeleteExperimentButton` (an `AlertDialog` confirm, then
   DELETE and navigate back to `/experiments`), and the tab navigation below them.
@@ -192,8 +192,7 @@ Only the scaler warning below names step ids. The API calls are in [api.md](api.
   `pipelines/[pipelineId]/page.tsx` (`EditPipeline`, which loads the pipeline into the editor). Each awaits `params` in
   a `<Suspense>` boundary, like the other tabs.
 - **`pipelines-list.tsx`** (`PipelinesList`): name (links to the editor), model label, feature count and last update,
-  with edit, and delete behind an `alert-dialog` confirm (runs keep their own copy of the spec). The Run button slot is
-  for #27.
+  with run ([Runs](#runs)), edit, and delete behind an `alert-dialog` confirm (runs keep their own copy of the spec).
 - **`pipeline-editor.tsx`** (`PipelineEditor`): one react-hook-form + zod form in cards:
   - Name.
   - Problem and data:
@@ -257,6 +256,40 @@ Only the scaler warning below names step ids. The API calls are in [api.md](api.
 - **`lib/api.ts`'s `ApiError`** now keeps a validation problem's `errors`, so the editor can show every message, not
   just the first.
 
+## Runs
+
+Running a pipeline creates a training run ([api.md](api.md#training-runs)), which the Runs tab
+(`/experiments/[id]/runs`) lists and a run's page (`/experiments/[id]/runs/[runId]`) follows live.
+
+- **`components/pipelines/run-pipeline-button.tsx`** (`RunPipelineButton`): on the pipelines list (an icon per row) and
+  above a saved pipeline's editor (it runs the saved version). It POSTs the run and, on 202, opens the run's page. A
+  400 (the spec no longer fits the dataset) or 503 (the training queue is down) shows the API's message as a toast.
+- **`components/runs/runs-table.tsx`** (`RunsTable`): pipeline name (links to the run), status, created, duration and
+  the headline metric: cross-validated accuracy for classification or R² for regression, to 3 decimal places, or `—`
+  without cross-validation. The list is re-read every 3 seconds while any run is queued or running (TanStack
+  `refetchInterval`, as in resource-provisioner).
+- **`components/runs/run-status-badge.tsx`** (`RunStatusBadge`): queued (grey), running (blue, with its %), succeeded
+  (green), failed (red).
+- **`components/runs/run-detail.tsx`** (`RunDetail`):
+  - A header with the status, a `progress` bar while it trains, and the latest message.
+  - The run's error, when it failed.
+  - Results, when it succeeded: rows used, the cross-validation metrics (mean ± std) and the search's best params.
+  - The pipeline it ran: data, split, steps and params, model, search.
+  - Its files (the run's artifacts) with downloads.
+  - "Evaluate this model" (succeeded runs only) is disabled with a "Coming soon" tooltip until #35.
+- **`components/runs/use-run-events.ts`** (`useRunEvents`): follows the run's server-sent events. It `fetch`es the
+  proxy's `…/runs/{runId}/events`, reads the body with a stream reader, and parses it with `SseParser`
+  (`lib/sse.ts`).
+  - Each `status` event goes into the TanStack cache (the run, and its row in the runs list), and `end` stops it.
+  - Before writing, it cancels any in-flight fetch of the run, so an older response can't land afterwards and undo a
+    newer event.
+  - If the stream drops it reconnects once. After that it returns `polling`, and the page polls the run every
+    3 seconds instead (`useRun`'s `poll`).
+- **`components/runs/use-runs.ts`**: `useRuns` (polling while in progress), `useRun`, `useRunArtifacts` and
+  `useStartRun` (never retried: a retry after a slow success would start a second run).
+- **`lib/runs.ts`**: the `Run` and `TrainingResult` types (`status` camelCase as the API sends it; `spec` and `result`
+  snake_case, passed through), the fetchers, `runEventsUrl`, `headlineMetric`, `formatMetric` and `formatDuration`.
+
 ## Admin: users
 
 `/admin/users` (linked from the main nav for admins only) lets `helix-admin` users invite colleagues by email, and
@@ -303,8 +336,8 @@ resend or revoke an invitation. It calls the API's invitation endpoints (see [ap
 ## shadcn components
 
 Installed: alert, alert-dialog, avatar, badge, button, card, checkbox, collapsible, dialog, dropdown-menu, field,
-input, label, radio-group, scroll-area, select, separator, skeleton, sonner, switch, table, tabs, textarea and
-tooltip. Add more with `npx shadcn@latest add <name>` from
+input, label, progress, radio-group, scroll-area, select, separator, skeleton, sonner, switch, table, tabs, textarea
+and tooltip. Add more with `npx shadcn@latest add <name>` from
 `web/`.
 
 Base UI components compose through the `render` prop rather than Radix's `asChild`:
