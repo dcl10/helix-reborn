@@ -12,6 +12,7 @@ members = [
     "helix-core",
     "helix-eda",
     "helix-services",
+    "helix-training",
 ]
 
 [[package]]
@@ -419,6 +420,17 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.8" },
 ]
+
+[[package]]
+name = "helix-training"
+version = "0.1.0"
+source = { editable = "training" }
+dependencies = [
+    { name = "helix-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "helix-core", editable = "packages/helix-core" }]
 
 [[package]]
 name = "httpcore"

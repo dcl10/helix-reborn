@@ -21,20 +21,23 @@ services/
     pyproject.toml
     src/helix_eda/
     tests/
-  training/                     aio-pika worker (added by #23)
+  training/                     aio-pika worker (package helix-training; see pipelines.md, "Training")
+    pyproject.toml
+    src/helix_training/
+    tests/
   evaluation/                   aio-pika worker (added by #28)
 ```
 
-Each of `training` and `evaluation` is added to `[tool.uv.workspace].members` and `[tool.pytest.ini_options].testpaths`
-by the issue that creates it.
+`evaluation` is added to `[tool.uv.workspace].members` and `[tool.pytest.ini_options].testpaths` by the issue that
+creates it.
 
 ### helix-core vs a service
 
 Put code in **helix-core** when more than one of the three services needs it: settings, S3 storage, dataset loading,
 the RabbitMQ message models, the worker base class, the pipeline step registry, ONNX export helpers, plotting
-helpers, JWT validation, and contract export (see [architecture.md](architecture.md#components)). helix-core has no
-runtime dependencies of its own yet; each service brings in what it needs (FastAPI, aio-pika, scikit-learn, etc.) and
-depends on helix-core.
+helpers, JWT validation, and contract export (see [architecture.md](architecture.md#components)). helix-core
+depends on what that shared code needs (pandas, boto3, aio-pika, scikit-learn, skl2onnx, onnxruntime, xgboost and so
+on); each service adds only what's specific to it (FastAPI for `eda`) and depends on helix-core.
 
 Put code in a **service** package when it's specific to that service: the FastAPI app and its routes (`eda`), the
 training pipeline fitting logic (`training`), or evaluation metrics/plots/explainability (`evaluation`).
