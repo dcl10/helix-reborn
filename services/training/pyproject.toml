@@ -1,0 +1,19 @@
+[project]
+name = "helix-training"
+version = "0.1.0"
+description = "Training worker for Helix Reborn: consumes training.jobs, fits pipelines and exports them to ONNX."
+requires-python = ">=3.12,<3.13"
+dependencies = ["helix-core"]
+
+[tool.uv.sources]
+helix-core = { workspace = true }
+
+[project.scripts]
+helix-training = "helix_training.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/helix_training"]
