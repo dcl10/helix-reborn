@@ -132,6 +132,9 @@ Keycloak itself — it only validates tokens the API already obtained.
 | --- | --- | --- | --- |
 | `GET /health` | none | — | `{"status": "ok", "version": "…"}` |
 | `POST /summary` | service token | `{"dataset_key": "…"}` | row/column counts and per-column summary statistics |
+| `POST /plots/target-distribution` | service token | `{"dataset_key", "output_key", "target_column", "show_kde", "bins", "plot_options"}` | a PNG's key, content type, size and title |
+| `POST /plots/correlation-heatmap` | service token | `{"dataset_key", "output_key", "columns", "method", "annotate", "plot_options"}` | a PNG's key, content type, size and title |
+| `POST /plots/pairplot` | service token | `{"dataset_key", "output_key", "columns", "hue_column", "corner", "diag_kind", "plot_options"}` | a PNG's key, content type, size and title |
 
 Every route but `/health` sits behind `helix_eda.dependencies.require_service_token`, which expects an
 `Authorization: Bearer <token>` header and validates it with `helix_core.auth.JwtValidator` (built from
@@ -145,6 +148,28 @@ mean/std/min/quartiles/max (rounded to 6 significant digits, `null` where a stat
 all-missing column); non-numeric columns get the 10 most common values and their counts instead. The route loads the
 dataset with `helix_core.datasets.load_csv`, which raises `InvalidDataError` (→ `422`) for an unreadable or empty CSV
 and whose underlying `StorageError` (→ `404`) is raised when the key doesn't exist.
+
+**Plots.** `helix_eda.plots` renders three plots with matplotlib/seaborn as pure `(df, request) -> (Figure, title)`
+functions, ported from the original Helix's `plotting.py`; `helix_eda.routes_plots` loads the dataset, calls one of
+them, uploads the PNG with `helix_core.plotting.save_figure` and returns its key, content type, size and title. Every
+request takes `dataset_key`, `output_key` (must end `.png`, else `422`) and an optional `plot_options`
+(`helix_core.messages.PlotOptions`); an unknown or non-numeric column, or too many columns, raises
+`InvalidSpecError` (→ `422`). Route functions are plain `def`, not `async def`, so FastAPI runs the CPU-bound
+rendering in its threadpool.
+
+- `target-distribution`: a histogram with an optional KDE curve for a numeric `target_column` (`bins`, 5-200,
+  `show_kde`), or a count bar chart for a non-numeric one.
+- `correlation-heatmap`: a correlation matrix (`method`: `pearson`/`spearman`/`kendall`) over `columns` (default: all
+  numeric, max 50), with a diverging colormap centred at 0 (`vmin`/`vmax` ±1), the upper triangle masked, and cell
+  annotations only when there are at most 20 columns.
+- `pairplot`: a seaborn pairplot over 2-10 numeric `columns`, with an optional `hue_column`, `corner` and `diag_kind`.
+  Datasets over 2000 rows are sampled to 2000 (`random_state=42`), noted in the title.
+
+Shared rendering helpers live in `helix_core.plotting` (used by the evaluation worker too): `use_headless_backend`
+forces matplotlib's `Agg` backend (no display in a container); `apply_style` applies a `PlotOptions`' seaborn theme
+and font-size rcParams; `finish_axes` sets a plot's title/labels/tick styling; `figure_to_png` renders a figure to PNG
+bytes and closes it; `save_figure` does that and uploads the PNG to S3. `PlotOptions.style` is restricted to one of
+`white`, `dark`, `whitegrid`, `darkgrid`, `ticks`.
 
 **Running it locally**
 
