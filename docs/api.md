@@ -187,7 +187,8 @@ AirPlay. `GET /api/me` is a quick way to check a token is accepted; `GET /health
 ## Migrations
 
 The initial migration only creates EF Core's own history table. `AddInvitations` adds the `Invitations` table and
-`AddExperiments` the `Experiments` and `Datasets` tables; further domain entities are added by later issues.
+`AddExperiments` the `Experiments` and `Datasets` tables, and `AddArtifacts` the `Artifacts` table; further domain
+entities are added by later issues.
 
 ```bash
 cd api
