@@ -49,8 +49,8 @@ needing their own ONNX code:
 `steps.py` defines `EvaluationStep`, a `Protocol` with `name`, `weight` (its share of the progress bar), `enabled(options)`
 and `run(ctx)`, and `STEPS`, the single ordered list every evaluation job runs: **metrics, plots, global feature
 importance, local feature importance, ensemble, fuzzy**. Keeping the order in one list, rather than scattered
-registrations, makes the run order obvious at a glance; issues #32–#33 each append their step at the right position.
-`STEPS` currently holds `MetricsStep`, `PlotsStep`, `GlobalImportanceStep` and `LocalImportanceStep`.
+registrations, makes the run order obvious at a glance; issue #33 appends the fuzzy step.
+`STEPS` currently holds `MetricsStep`, `PlotsStep`, `GlobalImportanceStep`, `LocalImportanceStep` and `EnsembleStep`.
 
 `run_steps(ctx, progress)` runs every step whose `enabled(ctx.job.options)` is `True`, in list order, and calls
 `progress(fraction, step.name)` after each one, with `fraction` the cumulative weight of finished steps over the
@@ -156,6 +156,33 @@ one column per feature, in the model's feature order.
 
 `ctx.results["local_importance"]` is `{"LIME": df, "SHAP": df}` with only the methods that ran — the input the fuzzy
 step (#33) reads.
+
+## Ensemble feature importance
+
+`EnsembleStep` (`fi/ensemble.py`), ported from the original Helix's `services/feature_importance/ensemble_methods.py`
+(`calculate_ensemble_mean`, `calculate_ensemble_majorityvote`) with the logic unchanged, and the bar chart from
+`plot_bar_chart`. Enabled when `options.ensemble_methods` is non-empty; it lists any of `"mean"`, `"majority_vote"`.
+It combines the global methods into one importance per feature, so it needs at least one global method: without
+`ctx.results["global_importance"]` it raises `InvalidSpecError("Ensemble importance needs at least one global
+method")`.
+
+The original Helix ensembled across several models and folds. An evaluation covers one model, so both functions get a
+single-entry dict, `{model step: ctx.results["global_importance"]}` (rows = features, columns = methods, values
+normalised to `[0, 1]`).
+
+- **Mean** (`ensemble_mean`): each feature's average across methods. Writes table and plot `ensemble_mean`.
+- **Majority vote** (`ensemble_majority_vote`): each method ranks the features (dense, 1 = most important); a
+  feature's importance is the mean of its values over all methods, counting as 0 the values from methods that didn't
+  give it its most common rank. When ranks tie for most common, the first two count and any further tied ranks are
+  dropped, as in the original. With only two methods every rank is a tie or a match, so the result equals the mean.
+  Writes table and plot `ensemble_majority_vote`.
+
+Both also return a standard deviation over repeated rows for the same feature (from the original's multi-fold
+input). With one model that's always `NaN`, so the bar charts have no error bars.
+
+`ctx.results["ensemble_importance"]` is `{"Mean": df, "Majority Vote": df}` with only the methods that ran (the keys
+the fuzzy step, #33, expects); each frame has one column, `"Mean Importance"` or `"Majority Vote Importance"`, sorted
+descending.
 
 ## Outputs
 
