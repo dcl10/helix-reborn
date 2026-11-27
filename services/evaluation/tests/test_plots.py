@@ -199,7 +199,9 @@ def test_plots_step_writes_regression_plots(regression_env) -> None:
 
 def test_plots_step_disabled_writes_no_plots(classification_env) -> None:
     storage, job, _df, _output = classification_env
-    job = job.model_copy(update={"options": EvaluationOptions(plots=False)})
+    job = job.model_copy(
+        update={"options": EvaluationOptions(plots=False, global_methods=[])}
+    )
     ctx = load_context(job, storage, n_jobs=1)
 
     assert not PlotsStep().enabled(job.options)

@@ -3,7 +3,10 @@ name = "helix-evaluation"
 version = "0.1.0"
 description = "Evaluation worker for Helix Reborn: consumes evaluation.jobs and evaluates ONNX models."
 requires-python = ">=3.12,<3.13"
-dependencies = ["helix-core"]
+dependencies = [
+    "helix-core",
+    "shap>=0.46",
+]
 
 [tool.uv.sources]
 helix-core = { workspace = true }
