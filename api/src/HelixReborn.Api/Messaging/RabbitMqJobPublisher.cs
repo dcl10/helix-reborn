@@ -13,7 +13,14 @@ public class RabbitMqJobPublisher(RabbitMqConnection connection) : IJobPublisher
   private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
 
   /// <inheritdoc />
-  public async Task PublishTrainingJobAsync(TrainingJob job, CancellationToken cancellationToken)
+  public Task PublishTrainingJobAsync(TrainingJob job, CancellationToken cancellationToken) =>
+    PublishAsync(Queues.TrainingJobs, job.JobId, JsonSerializer.SerializeToUtf8Bytes(job, JobMessageJson.Options), cancellationToken);
+
+  /// <inheritdoc />
+  public Task PublishEvaluationJobAsync(EvaluationJob job, CancellationToken cancellationToken) =>
+    PublishAsync(Queues.EvaluationJobs, job.JobId, JsonSerializer.SerializeToUtf8Bytes(job, JobMessageJson.Options), cancellationToken);
+
+  private async Task PublishAsync(string queue, Guid jobId, byte[] body, CancellationToken cancellationToken)
   {
     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     timeout.CancelAfter(PublishTimeout);
@@ -28,14 +35,13 @@ public class RabbitMqJobPublisher(RabbitMqConnection connection) : IJobPublisher
       {
         Persistent = true,
         ContentType = "application/json",
-        MessageId = job.JobId.ToString(),
+        MessageId = jobId.ToString(),
       };
-      var body = JsonSerializer.SerializeToUtf8Bytes(job, JobMessageJson.Options);
 
       // mandatory: an unroutable job (no queue) fails the publish instead of vanishing.
       await channel.BasicPublishAsync(
         exchange: "",
-        routingKey: Queues.TrainingJobs,
+        routingKey: queue,
         mandatory: true,
         basicProperties: properties,
         body: body,

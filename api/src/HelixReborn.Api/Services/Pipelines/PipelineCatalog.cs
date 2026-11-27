@@ -3,6 +3,7 @@ namespace HelixReborn.Api.Services.Pipelines;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Config;
+using Contracts;
 using Json.Schema;
 using Microsoft.Extensions.Options;
 
@@ -46,32 +47,8 @@ public class PipelineCatalog : IPipelineCatalog
   /// <param name="contentRoot">The app's content root.</param>
   /// <returns>The catalog file's full path.</returns>
   /// <exception cref="InvalidOperationException">No catalog file was found.</exception>
-  public static string ResolvePath(string root, string contentRoot)
-  {
-    if (System.IO.Path.IsPathRooted(root))
-    {
-      var path = System.IO.Path.Combine(root, FileName);
-      return File.Exists(path)
-        ? path
-        : throw new InvalidOperationException($"The pipeline catalog {path} doesn't exist. Check Contracts:Root.");
-    }
-
-    foreach (var start in new[] { contentRoot, AppContext.BaseDirectory })
-    {
-      for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
-      {
-        var path = System.IO.Path.Combine(dir.FullName, root, FileName);
-        if (File.Exists(path))
-        {
-          return path;
-        }
-      }
-    }
-
-    throw new InvalidOperationException(
-      $"Couldn't find {root}/{FileName} in {contentRoot}, {AppContext.BaseDirectory} or any of their parents. " +
-      "Set Contracts:Root to the contracts directory.");
-  }
+  public static string ResolvePath(string root, string contentRoot) =>
+    ContractFiles.Resolve(root, contentRoot, FileName, "pipeline catalog");
 
   private static Dictionary<string, CatalogStep> Parse(string json, string path)
   {

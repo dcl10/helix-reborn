@@ -110,6 +110,67 @@ namespace HelixReborn.Api.Data.Migrations
                     b.ToTable("Datasets");
                 });
 
+            modelBuilder.Entity("HelixReborn.Api.Models.Evaluation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ErrorType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ExperimentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MetricsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("OptionsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<double?>("Progress")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExperimentId");
+
+                    b.HasIndex("JobId")
+                        .IsUnique();
+
+                    b.HasIndex("RunId");
+
+                    b.ToTable("Evaluations");
+                });
+
             modelBuilder.Entity("HelixReborn.Api.Models.Experiment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -294,6 +355,21 @@ namespace HelixReborn.Api.Data.Migrations
                     b.HasOne("HelixReborn.Api.Models.Experiment", null)
                         .WithOne("Dataset")
                         .HasForeignKey("HelixReborn.Api.Models.Dataset", "ExperimentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HelixReborn.Api.Models.Evaluation", b =>
+                {
+                    b.HasOne("HelixReborn.Api.Models.Experiment", null)
+                        .WithMany()
+                        .HasForeignKey("ExperimentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HelixReborn.Api.Models.Run", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

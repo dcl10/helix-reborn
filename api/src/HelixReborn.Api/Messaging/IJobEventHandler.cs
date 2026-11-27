@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 
 /// <summary>
 /// Handles the events for one job type. <see cref="JobEventConsumer"/> dispatches each event to the handler whose
-/// <see cref="JobType"/> matches; events with no handler (evaluation, until #34) are logged and dropped.
+/// <see cref="JobType"/> matches; events with no handler are logged and dropped.
 /// </summary>
 [SuppressMessage(
   "Naming",

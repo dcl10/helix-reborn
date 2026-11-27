@@ -12,6 +12,16 @@ public interface IJobPublisher
   /// <returns>A task that completes once the broker has the job.</returns>
   /// <exception cref="JobPublishException">RabbitMQ is unreachable, or didn't accept the job.</exception>
   Task PublishTrainingJobAsync(TrainingJob job, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Publishes an evaluation job to <c>evaluation.jobs</c>, the same way as
+  /// <see cref="PublishTrainingJobAsync"/>.
+  /// </summary>
+  /// <param name="job">The job.</param>
+  /// <param name="cancellationToken">Cancels the publish.</param>
+  /// <returns>A task that completes once the broker has the job.</returns>
+  /// <exception cref="JobPublishException">RabbitMQ is unreachable, or didn't accept the job.</exception>
+  Task PublishEvaluationJobAsync(EvaluationJob job, CancellationToken cancellationToken);
 }
 
 /// <summary>A job couldn't be published: RabbitMQ is unreachable, or didn't confirm it.</summary>

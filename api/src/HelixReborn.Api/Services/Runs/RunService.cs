@@ -1,10 +1,10 @@
 namespace HelixReborn.Api.Services.Runs;
 
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Data;
 using Experiments;
+using Jobs;
 using Messaging;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -26,9 +26,6 @@ public class RunService(
   IServiceScopeFactory scopes,
   TimeProvider time) : IRunService
 {
-  /// <summary>How often <see cref="FollowAsync"/> polls the run.</summary>
-  public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
-
   /// <summary><see cref="Run.ErrorType"/> of a run whose job couldn't be published.</summary>
   public const string QueueUnavailable = "QueueUnavailable";
 
@@ -131,42 +128,17 @@ public class RunService(
     CancellationToken cancellationToken = default)
   {
     var first = await GetAsync(experimentId, runId, userId, isAdmin, cancellationToken);
-    return Follow(first, experimentId, runId, cancellationToken);
-  }
-
-  private async IAsyncEnumerable<RunResponse> Follow(
-    RunResponse first,
-    Guid experimentId,
-    Guid runId,
-    [EnumeratorCancellation] CancellationToken cancellationToken)
-  {
-    yield return first;
-    var last = Fingerprint(first);
-    var terminal = first.Status is RunStatus.Succeeded or RunStatus.Failed;
-
-    while (!terminal)
-    {
-      await Task.Delay(PollInterval, time, cancellationToken);
-
-      // A fresh scope per poll: the stream can stay open for hours, and a DbContext mustn't.
-      await using var scope = scopes.CreateAsyncScope();
-      var pollDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-      var run = await Find(pollDb, experimentId, runId, cancellationToken);
-      if (run is null)
-      {
-        yield break;
-      }
-
-      var current = RunResponse.From(run);
-      var fingerprint = Fingerprint(current);
-      if (fingerprint != last)
-      {
-        last = fingerprint;
-        yield return current;
-      }
-
-      terminal = run.IsTerminal;
-    }
+    return JobStatusFeed.Poll(
+      first,
+      async (services, ct) =>
+        await Find(services.GetRequiredService<AppDbContext>(), experimentId, runId, ct) is { } run
+          ? RunResponse.From(run)
+          : null,
+      run => run.Status is RunStatus.Succeeded or RunStatus.Failed,
+      Fingerprint,
+      scopes,
+      time,
+      cancellationToken);
   }
 
   private static Task<Run?> Find(AppDbContext db, Guid experimentId, Guid runId, CancellationToken cancellationToken) =>
