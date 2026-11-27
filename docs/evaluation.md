@@ -49,8 +49,7 @@ needing their own ONNX code:
 `steps.py` defines `EvaluationStep`, a `Protocol` with `name`, `weight` (its share of the progress bar), `enabled(options)`
 and `run(ctx)`, and `STEPS`, the single ordered list every evaluation job runs: **metrics, plots, global feature
 importance, local feature importance, ensemble, fuzzy**. Keeping the order in one list, rather than scattered
-registrations, makes the run order obvious at a glance; issue #33 appends the fuzzy step.
-`STEPS` currently holds `MetricsStep`, `PlotsStep`, `GlobalImportanceStep`, `LocalImportanceStep` and `EnsembleStep`.
+registrations, makes the run order obvious at a glance; all six are implemented.
 
 `run_steps(ctx, progress)` runs every step whose `enabled(ctx.job.options)` is `True`, in list order, and calls
 `progress(fraction, step.name)` after each one, with `fraction` the cumulative weight of finished steps over the
@@ -183,6 +182,46 @@ input). With one model that's always `NaN`, so the bar charts have no error bars
 `ctx.results["ensemble_importance"]` is `{"Mean": df, "Majority Vote": df}` with only the methods that ran (the keys
 the fuzzy step, #33, expects); each frame has one column, `"Mean Importance"` or `"Majority Vote Importance"`, sorted
 descending.
+
+## Fuzzy interpretation
+
+`FuzzyStep` (`fi/fuzzy.py`), ported from the original Helix's `feature_importance/fuzzy.py` (`Fuzzy`, here
+`FuzzyInterpreter`) and the plotting helpers `save_fuzzy_sets_plots` / `save_target_clusters_plots`. Enabled when
+`options.fuzzy` is set; `EvaluationOptions` validation guarantees at least one local and one ensemble method ran, and
+it reads `ctx.results["local_importance"]` and `ctx.results["ensemble_importance"]`.
+
+**What it tells you.** Local importance gives a number per feature per sample; fuzzy interpretation turns those into
+rules like "when the target is *high*, x0 has *high* importance and x3 has *low* importance". Read the outputs as:
+
+- A **context** is a group of samples: the target class for classification, or for regression a fuzzy cluster of the
+  target values named by `cluster_names`, lowest cluster first ("very low" … "very high").
+- Each sample's importance for a feature is labelled **low**, **medium** or **high** relative to all explained samples
+  (importances are min-max scaled to `[0, 1]` per method, then matched against fixed membership functions: Z-shaped
+  for low, a triangle around 0.5 for medium, S-shaped for high). Scaling is of the signed value, so "low" means "the
+  most negative contribution seen", not "close to zero".
+- A **rule** is one sample's combination of labels within its context. **`fuzzy_rules`** ("Fuzzy rules") lists the
+  `number_rules` most common rules per context, with `records`, how many samples (across LIME and SHAP) follow each.
+- **`fuzzy_contextual_rules`** ("Fuzzy rules by context") summarises them: rows are features, columns are contexts,
+  and each cell is the highest label that feature has in any of the context's top rules. A feature that's "high" in
+  the "very high" column and "low" elsewhere matters mostly for the largest target values.
+
+**Steps.**
+
+1. Pick the top `number_fuzzy_features` features by the majority-vote ensemble, falling back to the mean ensemble
+   (with a log warning) when majority vote wasn't run. Only these features appear in the rules.
+2. If `granular_features`, build low/medium/high membership functions for each selected feature from the training
+   set's quartiles and plot them: `fuzzy_sets_{feature}` (the name sanitised to `[A-Za-z0-9_-]`).
+3. Scale each local method's importances to `[0, 1]`, append the explained samples' targets (class labels for
+   classification) and stack the methods.
+4. Regression only: cluster the target with fuzzy c-means (`number_clusters`, seeded with the split's random seed),
+   name clusters by their mean target and plot `fuzzy_target_clusters` (box plots of the target per cluster).
+5. Label every importance low/medium/high, count rule occurrences per context and write both tables.
+
+**Differences from the original**, each needed for the options to have their documented effect: feature selection
+sorted by a column `0` that doesn't exist (so it always failed silently) and the rules then used every feature; the
+membership plots were drawn for train and then test into the same files; c-means wasn't seeded; and the first table
+was the per-sample rules, then overwritten by the summary. Known quirks kept from the original: the cluster naming
+pairs present cluster numbers with averages by position, so if c-means leaves a cluster empty, names can shift.
 
 ## Outputs
 
