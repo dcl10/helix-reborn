@@ -1,10 +1,16 @@
+from io import BytesIO
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from helix_core.messages import EvaluationJob, EvaluationOptions, PipelineSpec, TrainingJob
+from helix_core.messages import (
+    EvaluationJob,
+    EvaluationOptions,
+    PipelineSpec,
+    TrainingJob,
+)
 from helix_core.storage import Storage, join_key
 from helix_evaluation.context import load_context
 from helix_evaluation.fi.global_methods import normalise
@@ -124,11 +130,17 @@ def test_permutation_and_shap_rank_true_features_top(s3_storage: Storage) -> Non
     GlobalImportanceStep().run(ctx)
 
     perm_df = pd.read_csv(
-        s3_storage.get_bytes("experiments/e/evaluations/v/tables/global_permutation.csv"),
+        BytesIO(
+            s3_storage.get_bytes(
+                "experiments/e/evaluations/v/tables/global_permutation.csv"
+            )
+        ),
         index_col=0,
     )
     shap_df = pd.read_csv(
-        s3_storage.get_bytes("experiments/e/evaluations/v/tables/global_shap.csv"),
+        BytesIO(
+            s3_storage.get_bytes("experiments/e/evaluations/v/tables/global_shap.csv")
+        ),
         index_col=0,
     )
 
