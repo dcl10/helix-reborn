@@ -50,7 +50,7 @@ needing their own ONNX code:
 and `run(ctx)`, and `STEPS`, the single ordered list every evaluation job runs: **metrics, plots, global feature
 importance, local feature importance, ensemble, fuzzy**. Keeping the order in one list, rather than scattered
 registrations, makes the run order obvious at a glance; issues #29–#33 each append their step at the right position.
-This issue implements only `metrics`, so `STEPS` currently holds just `MetricsStep`.
+`STEPS` currently holds `MetricsStep` and `GlobalImportanceStep`; issues #29 and #31–#33 append the rest.
 
 `run_steps(ctx, progress)` runs every step whose `enabled(ctx.job.options)` is `True`, in list order, and calls
 `progress(fraction, step.name)` after each one, with `fraction` the cumulative weight of finished steps over the
@@ -79,6 +79,32 @@ the original Helix's `helix/services/metrics.py` and `options/choices/metrics.py
 `roc_auc` is `roc_auc_score(y, proba[:, 1])` for binary classification, and
 `roc_auc_score(y, proba, multi_class="ovr", average="weighted")` for more than two classes; it's `null` when the
 split's `y` has only one class (the score is undefined).
+
+## Global feature importance
+
+`GlobalImportanceStep` (`fi/global_methods.py`, `fi/plots.py`), ported from the original Helix's
+`services/feature_importance/global_methods.py` and `FeatureImportanceEstimator._global_feature_importance`. Enabled
+when `options.global_methods` (`EvaluationOptions`) is non-empty; it lists any of `"permutation"`, `"shap"`.
+
+Both methods explain the same rows: the test set, sampled down to 500 rows with `random_state =
+metadata.pipeline.split.random_seed` when it's larger. SHAP additionally needs a background sample, `shap.sample(
+x_train, 100, random_state=seed)`.
+
+- **Permutation importance** (`sklearn.inspection.permutation_importance`, `options.permutation_repeats` repeats,
+  `ctx.n_jobs` workers): scored with `f1_weighted` for classification and `neg_mean_absolute_error` for regression
+  (the original Helix's default, signed so higher is always better). Writes table `global_permutation`
+  (`importance_mean`/`importance_std` per feature, sorted descending) and plot `global_permutation`, a horizontal bar
+  chart of the top `options.num_features_to_plot` features with standard-deviation error bars.
+- **SHAP**: `shap.Explainer(ctx.model.predict, x_background)` — a plain callable, so SHAP picks its model-agnostic
+  Permutation explainer. Writes table `global_shap` (`mean_abs_shap` per feature, sorted descending), plot
+  `global_shap_bar` (top-N bar chart by mean |SHAP|) and plot `global_shap_beeswarm`
+  (`shap.plots.beeswarm`). For classification, `ctx.model.predict` returns the label-encoded class index rather than
+  the original class value — the same behaviour as the original Helix, and acceptable because SHAP only needs a
+  numeric model output to attribute.
+
+`ctx.results["global_importance"]` is set to a `pandas.DataFrame` indexed by feature, with a `"Permutation"` and/or
+`"SHAP"` column (only for the methods that ran) holding each method's importances min-max scaled to `[0, 1]` by
+`normalise` (a constant series becomes all zeros). This is the shape the ensemble step (#32) averages across methods.
 
 ## Outputs
 
