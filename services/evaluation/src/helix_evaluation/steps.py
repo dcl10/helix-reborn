@@ -386,4 +386,6 @@ def run_steps(ctx: EvaluationContext, progress: Progress) -> None:
     for step in enabled_steps:
         step.run(ctx)
         completed_weight += step.weight
-        progress(completed_weight / total_weight, step.name)
+        # Summing float weights can overshoot 1 by a rounding error (e.g.
+        # 1.0000000000000002), which JobEvent rejects; cap it.
+        progress(min(completed_weight / total_weight, 1.0), step.name)
