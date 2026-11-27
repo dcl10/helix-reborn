@@ -1,13 +1,14 @@
 "use client";
 
 import { Download, FlaskConical, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 
 import { RunStatusBadge } from "@/components/runs/run-status-badge";
 import { useRunEvents } from "@/components/runs/use-run-events";
 import { useRun, useRunArtifacts } from "@/components/runs/use-runs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,12 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { artifactContentUrl } from "@/lib/eda";
+import { experimentPath } from "@/lib/experiments";
 import { formatGridValue } from "@/lib/pipelines";
 import { formatDuration, isActive, type Run } from "@/lib/runs";
 
@@ -304,18 +301,13 @@ export function RunDetail({
           </dl>
           {data.status === "succeeded" && (
             <div>
-              {/* Evaluations come in #35; until then the button explains itself. */}
-              <Tooltip>
-                <TooltipTrigger
-                  render={<span tabIndex={0} className="inline-block" />}
-                >
-                  <Button type="button" variant="outline" disabled>
-                    <FlaskConical />
-                    Evaluate this model
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Coming soon</TooltipContent>
-              </Tooltip>
+              <Link
+                href={`${experimentPath(experimentId, "evaluations")}/new?${new URLSearchParams({ runId })}`}
+                className={buttonVariants({ variant: "outline" })}
+              >
+                <FlaskConical />
+                Evaluate this model
+              </Link>
             </div>
           )}
         </CardContent>
