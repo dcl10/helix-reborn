@@ -49,8 +49,8 @@ needing their own ONNX code:
 `steps.py` defines `EvaluationStep`, a `Protocol` with `name`, `weight` (its share of the progress bar), `enabled(options)`
 and `run(ctx)`, and `STEPS`, the single ordered list every evaluation job runs: **metrics, plots, global feature
 importance, local feature importance, ensemble, fuzzy**. Keeping the order in one list, rather than scattered
-registrations, makes the run order obvious at a glance; issues #29–#33 each append their step at the right position.
-This issue implements only `metrics`, so `STEPS` currently holds just `MetricsStep`.
+registrations, makes the run order obvious at a glance; issues #30–#33 each append their step at the right position.
+`STEPS` currently holds `MetricsStep` and `PlotsStep`.
 
 `run_steps(ctx, progress)` runs every step whose `enabled(ctx.job.options)` is `True`, in list order, and calls
 `progress(fraction, step.name)` after each one, with `fraction` the cumulative weight of finished steps over the
@@ -79,6 +79,28 @@ the original Helix's `helix/services/metrics.py` and `options/choices/metrics.py
 `roc_auc` is `roc_auc_score(y, proba[:, 1])` for binary classification, and
 `roc_auc_score(y, proba, multi_class="ovr", average="weighted")` for more than two classes; it's `null` when the
 split's `y` has only one class (the score is undefined).
+
+## Plots
+
+Enabled when `options.plots` is `True` (the default). Renders standard performance plots for the **test set only**,
+using the shared styling helpers in `helix_core.plotting` (`apply_style`, `finish_axes`) and `ctx.plot_options`, and
+saves each one through `ctx.save_plot(name, fig, title)` (`plots/{name}.png`, recorded as a `plot` artifact). Ported
+from the original Helix's `helix/services/plotting.py` (`plot_auc_roc`, `plot_confusion_matrix`, `plot_scatter`),
+dropping the Streamlit code. Tick labels for the confusion matrix and legend entries for the ROC/PR curves use the
+encoded `y` with `metadata.classes` as labels, not classes re-derived from the data.
+
+| Name | Problem type | Title | Content |
+| --- | --- | --- | --- |
+| `confusion_matrix` | classification | "Confusion matrix" | Counts heatmap, tick labels = `metadata.classes` (as strings), colour map `plot_options.colour_map` |
+| `confusion_matrix_normalised` | classification | "Confusion matrix (normalised)" | Row-normalised |
+| `roc_curve` | classification | "ROC curve" | Binary: one curve with the AUC in the legend. Multi-class: one-vs-rest curve per class plus the micro-average |
+| `precision_recall_curve` | classification | "Precision-recall curve" | Same structure, with average precision in the legend |
+| `predicted_vs_actual` | regression | "Predicted vs actual" | Scatter, y=x reference line, R² in the title |
+| `residuals` | regression | "Residuals" | Residual (actual − predicted) vs predicted scatter, with a y=0 line |
+| `residuals_histogram` | regression | "Residual distribution" | Histogram with KDE |
+
+`roc_curve` and `precision_recall_curve` are skipped, with a log warning, when the test set's `y` has only one class
+(the curves are undefined); the rest of the step still runs.
 
 ## Outputs
 
