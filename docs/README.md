@@ -13,7 +13,7 @@ exist yet.
 | [python-services.md](python-services.md) | Workspace layout, helix-core vs a service, commands, conventions, tests |
 | [contracts.md](contracts.md) | Why the message contracts exist, each message with an example, ack/reject rules, how to regenerate them |
 | [pipelines.md](pipelines.md) | Pipeline specs and their validation, the step registry and catalog, every step, the training worker (algorithm, metrics, outputs), ONNX export (input/output contract, label encoding, parity check, adding a converter), model metadata |
-| evaluation.md | *(planned)* |
+| [evaluation.md](evaluation.md) | The evaluation worker: inputs/outputs, the ONNX model adapter, the step framework, metrics definitions |
 | [deployment.md](deployment.md) | Infrastructure: what Terraform creates, one-time manual steps, variables, running it locally, outputs, teardown |
 | user-guide.md | *(planned)* |
 
