@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Fixtures;
 using Json.Schema;
 using Messaging;
+using Services.Evaluations;
 using Services.Pipelines;
 using Xunit;
 
@@ -51,6 +52,41 @@ public partial class JobMessagesSchemaTests
     var node = JsonNode.Parse(json)!.AsObject();
     Assert.Equal(1, (int)node["schema_version"]!);
     Assert.True(node.ContainsKey("output_prefix"));
+  }
+
+  [Fact]
+  public void EvaluationJob_MatchesTheContractSchema()
+  {
+    var options = EvaluationOptionsValidator.Read(JsonNode.Parse("""
+      {"local_methods": ["lime", "shap"], "ensemble_methods": ["mean"],
+       "fuzzy": {"number_clusters": 3, "cluster_names": ["low", "medium", "high"]},
+       "plot_options": {"dpi": 200}}
+      """)!.AsObject());
+    var job = new EvaluationJob(
+      Guid.NewGuid(),
+      Guid.NewGuid(),
+      Guid.NewGuid(),
+      Guid.NewGuid(),
+      "experiments/e/datasets/d/data.csv",
+      "experiments/e/runs/r/",
+      "experiments/e/evaluations/v/",
+      options);
+
+    var json = JsonSerializer.Serialize(job, JobMessageJson.Options);
+
+    AssertValid(Schema("evaluation-job"), json);
+    var node = JsonNode.Parse(json)!.AsObject();
+    Assert.Equal(1, (int)node["schema_version"]!);
+    Assert.Equal(3, (int)node["options"]!["fuzzy"]!["number_clusters"]!);
+  }
+
+  [Fact]
+  public void EvaluationJob_WithDefaultOptions_MatchesTheContractSchema()
+  {
+    var job = new EvaluationJob(
+      Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "d.csv", "m/", "o/", new EvaluationJobOptions());
+
+    AssertValid(Schema("evaluation-job"), JsonSerializer.Serialize(job, JobMessageJson.Options));
   }
 
   [Theory]
