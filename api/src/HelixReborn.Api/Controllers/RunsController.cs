@@ -1,12 +1,10 @@
 namespace HelixReborn.Api.Controllers;
 
-using System.Net.ServerSentEvents;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Auth;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Services.Experiments;
+using Services.Jobs;
 using Services.Pipelines;
 using Services.Runs;
 
@@ -22,8 +20,6 @@ using Services.Runs;
 [Route("api/experiments/{experimentId:guid}")]
 public class RunsController(IRunService runs, ICurrentUser currentUser) : ControllerBase
 {
-  private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
-
   /// <summary>Starts a run of a pipeline: validates its spec again, then queues a training job. Owner only.</summary>
   /// <param name="experimentId">Experiment ID.</param>
   /// <param name="pipelineId">Pipeline ID.</param>
@@ -73,28 +69,12 @@ public class RunsController(IRunService runs, ICurrentUser currentUser) : Contro
     {
       var states = await runs.FollowAsync(
         experimentId, runId, currentUser.UserId, currentUser.IsAdmin, cancellationToken);
-      return TypedResults.ServerSentEvents(ToSse(states, cancellationToken));
+      return TypedResults.ServerSentEvents(JobStatusFeed.ToServerSentEvents(
+        states, run => run.Status is RunStatus.Succeeded or RunStatus.Failed, run => run.Status, cancellationToken));
     }
     catch (Exception ex) when (ex is ExperimentNotFoundException or RunNotFoundException)
     {
       return TypedResults.Problem(ex.Message, statusCode: StatusCodes.Status404NotFound);
-    }
-  }
-
-  private static async IAsyncEnumerable<SseItem<string>> ToSse(
-    IAsyncEnumerable<RunResponse> states,
-    [EnumeratorCancellation] CancellationToken cancellationToken)
-  {
-    RunResponse? last = null;
-    await foreach (var state in states.WithCancellation(cancellationToken))
-    {
-      last = state;
-      yield return new SseItem<string>(JsonSerializer.Serialize(state, EventJson), "status");
-    }
-
-    if (last is { Status: RunStatus.Succeeded or RunStatus.Failed })
-    {
-      yield return new SseItem<string>(JsonSerializer.Serialize(new { status = last.Status }, EventJson), "end");
     }
   }
 

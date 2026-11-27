@@ -31,6 +31,10 @@ api/
       Pipelines/                 IPipelineCatalog (contracts/pipeline-catalog.json), PipelineSpec, PipelineSpecValidator,
                                  IPipelineService, PipelineService and their exceptions
       Runs/                      IRunService, RunService, RunEventHandler (training job events)
+      Evaluations/               IEvaluationService, EvaluationService, EvaluationEventHandler (evaluation job events),
+                                 EvaluationOptionsValidator and their exceptions
+      Jobs/                      JobStatusFeed: polling a run or evaluation and streaming it as server-sent events
+      Contracts/                 ContractFiles: finding files under contracts/
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
       Keycloak/                  IKeycloakUserAdmin over the Keycloak admin API (Kiota client)
       Storage/                   IObjectStorage, S3ObjectStorage, StorageKeys
@@ -329,8 +333,8 @@ helix-core's).
 **Consuming events.** `JobEventConsumer`, a `BackgroundService`, consumes `jobs.events`:
 
 - Manual acks, prefetch 20.
-- Each event goes to the `IJobEventHandler` whose `JobType` matches, in a fresh DI scope. Evaluation events have no
-  handler until #34, so they're logged and acked.
+- Each event goes to the `IJobEventHandler` whose `JobType` matches (`RunEventHandler` for `training`,
+  `EvaluationEventHandler` for `evaluation`), in a fresh DI scope. An event with no handler is logged and acked.
 - An unreadable event is logged and acked. A handler exception is nacked with requeue after a second.
 - If RabbitMQ is down it retries with backoff (1 s doubling to 30 s), so the API starts and serves requests without
   it. RabbitMQ.Client's own automatic recovery is off, so a reconnect can't leave two consumers.
@@ -353,11 +357,94 @@ Events can arrive twice or out of order, so handling is idempotent:
 **Following a run.** The SSE endpoint uses `TypedResults.ServerSentEvents`. `RunService.FollowAsync` checks access
 first, so a 404 comes back as a problem rather than an empty stream. It then polls the run every second in a fresh DI
 scope (never holding a `DbContext` for the whole stream) and yields it whenever its status, progress, message,
-timestamps or error change.
+timestamps or error change. The polling and the `status`/`end` events are `Services/Jobs/JobStatusFeed`, shared with
+evaluations.
 
 Tests replace `IJobPublisher` with `FakeJobPublisher` (records jobs; `FailFor` makes one experiment's publishes throw)
 and don't run `JobEventConsumer`. `RunEventHandlerTests` call the handler directly, and the SSE tests parse the stream
 with `Fixtures/Sse.cs`.
+
+## Evaluations
+
+Evaluating a succeeded run's model creates an **evaluation**. The API validates the options, stores a `Queued`
+evaluation with the options (defaults filled in) and publishes an `EvaluationJob` to `evaluation.jobs`. The
+evaluation worker (`services/evaluation`, see [evaluation.md](evaluation.md)) reports back on `jobs.events` with
+`job_type` `evaluation`, and `EvaluationEventHandler` applies the events. Reads are for the owner or `helix-admin`;
+only the owner can start one. Evaluations are cascade deleted with their run and experiment.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `POST` | `/api/experiments/{id}/runs/{runId}/evaluations` | Body `{"options": {…}}` (snake_case, optional; missing fields take the defaults). Validates, stores a `Queued` evaluation and publishes its job. `202` with the evaluation and `Location`. |
+| `GET` | `/api/experiments/{id}/evaluations?runId=` | The experiment's evaluations, newest first; `runId` filters to one run's. |
+| `GET` | `/api/experiments/{id}/evaluations/{evaluationId}` | One evaluation. |
+| `GET` | `/api/experiments/{id}/evaluations/{evaluationId}/events` | Server-sent events, the same protocol as runs: `status` with the evaluation, then `end`. |
+
+An `EvaluationResponse` is `{"id", "runId", "pipelineName", "status", "progress", "message", "options", "metrics",
+"error", "createdAt", "startedAt", "finishedAt"}`:
+
+- `status` is `queued`, `running`, `succeeded` or `failed`; `progress` and `message` are the worker's (its step names).
+- `options` is what was sent to the worker, snake_case, with every default filled in.
+- `metrics` is the `succeeded` result's `metrics`: the **test-set** metrics only. Train and test metrics are both in
+  the `metrics.json` artifact.
+- `pipelineName` is the run's, joined in on read.
+- `error` is `{"type", "message"}`.
+
+**Options.** Defaults, as helix-core's `EvaluationOptions`:
+
+```json
+{ "plots": true, "global_methods": ["permutation", "shap"], "permutation_repeats": 10,
+  "local_methods": [], "local_max_samples": 50, "ensemble_methods": [], "num_features_to_plot": 10,
+  "fuzzy": null, "plot_options": null }
+```
+
+`fuzzy`, when set, defaults to `{"number_fuzzy_features": 10, "granular_features": true, "number_clusters": 5,
+"cluster_names": ["very low", "low", "medium", "high", "very high"], "number_rules": 5}`.
+
+`EvaluationOptionsValidator` (a singleton) checks the options against the `EvaluationOptions` definition in
+`contracts/messages/evaluation-job.schema.json` (JsonSchema.Net, compiled once), so ranges, enums and unknown fields
+follow helix-core. It then applies the cross-field rules:
+
+- `fuzzy` needs at least one local method and at least one ensemble method.
+- `fuzzy.cluster_names` must have exactly `fuzzy.number_clusters` names (including the default five).
+- `ensemble_methods` needs at least one global method (the worker's ensemble step would fail otherwise).
+
+The options are then read into `EvaluationJobOptions` (`Messaging/JobMessages.cs`), whose property initialisers are
+the defaults, and serialized back to snake_case for both the stored `OptionsJson` and the job. `plot_options` is passed
+through as is.
+
+Errors:
+
+| Cause | Response |
+| --- | --- |
+| Experiment, run or evaluation missing or not visible, or an admin starting one | `404` |
+| Invalid options | `400` `ValidationProblemDetails`, `errors.options` (`"field: problem"` messages) |
+| The run isn't `succeeded`, or the experiment has no dataset | `409` |
+| The job couldn't be published | `503`; the evaluation is stored as `failed` with error type `QueueUnavailable` |
+
+**Publishing.** `EvaluationJob` values: `dataset_key` the experiment's dataset, `model_prefix`
+`StorageKeys.RunPrefix(e, r)`, `output_prefix` `StorageKeys.EvaluationPrefix(e, v)`
+(`experiments/{e}/evaluations/{v}/`), `job_id` a new ID stored as the evaluation's `JobId`, and the options.
+`RabbitMqJobPublisher.PublishEvaluationJobAsync` publishes it exactly as training jobs are, with routing key
+`evaluation.jobs`.
+
+**Events.** `EvaluationEventHandler` is idempotent in the same ways as `RunEventHandler` (unknown evaluation, other job
+ID or terminal state: ignored). On `succeeded` it stores `result.metrics` and records each `result.artifacts[]` entry
+not already recorded, with `sourceType` `"evaluation"` and `sourceId` the evaluation:
+
+| Entry `kind` | Artifact kind |
+| --- | --- |
+| `plot` | `evaluationPlot` |
+| `table` | `evaluationTable` |
+| `json` | `metrics` |
+
+The title and key come from the entry, the content type from the key's extension (`.png` `image/png`, `.csv`
+`text/csv`, `.json` `application/json`), and the size from `IObjectStorage.ListAsync` of the evaluation's prefix. An
+entry whose file isn't in storage, or with no key or an unknown kind, is logged and skipped. The web app lists them
+with `GET /api/experiments/{id}/artifacts?sourceType=evaluation&sourceId={evaluationId}`.
+
+Tests: `EvaluationsControllerTests`, `EvaluationEventHandlerTests` (calling the handler directly, as for runs),
+`EvaluationOptionsValidatorTests`, and `JobMessagesSchemaTests` validating the serialized `EvaluationJob` against the
+contract schema. `Fixtures/EvaluationSetup.cs` builds a succeeded run and applies evaluation events.
 
 ## Running it
 

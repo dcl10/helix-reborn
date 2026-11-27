@@ -1,8 +1,7 @@
 namespace HelixReborn.Api.Tests;
 
 using Config;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Fixtures;
 using Microsoft.Extensions.Options;
 using Services.Pipelines;
 using Xunit;
@@ -11,7 +10,7 @@ public class PipelineCatalogTests
 {
   /// <summary>The repo's real catalog, found by walking up from the test's output directory.</summary>
   public static PipelineCatalog RepoCatalog() =>
-    new(Options.Create(new ContractsOptions()), new TestEnvironment(AppContext.BaseDirectory));
+    new(Options.Create(new ContractsOptions()), new TestHostEnvironment(AppContext.BaseDirectory));
 
   [Fact]
   public void Constructor_LoadsTheRepoCatalog_FromARelativeRoot()
@@ -56,7 +55,7 @@ public class PipelineCatalogTests
 
     var ex = Assert.Throws<InvalidOperationException>(() => new PipelineCatalog(
       Options.Create(new ContractsOptions { Root = root }),
-      new TestEnvironment(AppContext.BaseDirectory)));
+      new TestHostEnvironment(AppContext.BaseDirectory)));
 
     Assert.Contains("doesn't exist", ex.Message);
   }
@@ -71,7 +70,7 @@ public class PipelineCatalogTests
 
       var ex = Assert.Throws<InvalidOperationException>(() => new PipelineCatalog(
         Options.Create(new ContractsOptions { Root = root }),
-        new TestEnvironment(AppContext.BaseDirectory)));
+        new TestHostEnvironment(AppContext.BaseDirectory)));
 
       Assert.Contains("schema_version", ex.Message);
     }
@@ -79,16 +78,5 @@ public class PipelineCatalogTests
     {
       Directory.Delete(root, recursive: true);
     }
-  }
-
-  private sealed class TestEnvironment(string contentRoot) : IHostEnvironment
-  {
-    public string EnvironmentName { get; set; } = "Testing";
-
-    public string ApplicationName { get; set; } = "HelixReborn.Api";
-
-    public string ContentRootPath { get; set; } = contentRoot;
-
-    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
   }
 }

@@ -34,4 +34,11 @@ public static class StorageKeys
   /// <param name="runId">The run's ID.</param>
   /// <returns><c>experiments/{experimentId}/runs/{runId}/</c></returns>
   public static string RunPrefix(Guid experimentId, Guid runId) => $"{Experiment(experimentId)}runs/{runId:D}/";
+
+  /// <summary>The prefix an evaluation's worker writes its metrics, plots and tables under.</summary>
+  /// <param name="experimentId">The experiment's ID.</param>
+  /// <param name="evaluationId">The evaluation's ID.</param>
+  /// <returns><c>experiments/{experimentId}/evaluations/{evaluationId}/</c></returns>
+  public static string EvaluationPrefix(Guid experimentId, Guid evaluationId) =>
+    $"{Experiment(experimentId)}evaluations/{evaluationId:D}/";
 }

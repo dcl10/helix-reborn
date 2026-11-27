@@ -28,6 +28,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   /// <summary>Training runs: a pipeline snapshot and the worker's progress.</summary>
   public DbSet<Run> Runs => Set<Run>();
 
+  /// <summary>Evaluations of runs' models: the options and the worker's progress.</summary>
+  public DbSet<Evaluation> Evaluations => Set<Evaluation>();
+
   /// <inheritdoc />
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -125,6 +128,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         .WithMany()
         .HasForeignKey(x => x.PipelineId)
         .OnDelete(DeleteBehavior.SetNull);
+    });
+
+    modelBuilder.Entity<Evaluation>(evaluation =>
+    {
+      evaluation.Property(x => x.OptionsJson).HasColumnType("jsonb");
+      evaluation.Property(x => x.MetricsJson).HasColumnType("jsonb");
+      evaluation.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+      evaluation.Property(x => x.ErrorType).HasMaxLength(100);
+      evaluation.Ignore(x => x.IsTerminal);
+
+      evaluation.HasIndex(x => x.ExperimentId);
+      evaluation.HasIndex(x => x.RunId);
+      evaluation.HasIndex(x => x.JobId).IsUnique();
+
+      evaluation.HasOne<Experiment>()
+        .WithMany()
+        .HasForeignKey(x => x.ExperimentId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      evaluation.HasOne<Run>()
+        .WithMany()
+        .HasForeignKey(x => x.RunId)
+        .OnDelete(DeleteBehavior.Cascade);
     });
   }
 }

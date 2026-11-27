@@ -10,10 +10,14 @@ using Messaging;
 public class FakeJobPublisher : IJobPublisher
 {
   private readonly ConcurrentQueue<TrainingJob> _jobs = new();
+  private readonly ConcurrentQueue<EvaluationJob> _evaluationJobs = new();
   private readonly ConcurrentDictionary<Guid, bool> _failing = new();
 
   /// <summary>Every training job published, oldest first.</summary>
   public IReadOnlyList<TrainingJob> TrainingJobs => [.. _jobs];
+
+  /// <summary>Every evaluation job published, oldest first.</summary>
+  public IReadOnlyList<EvaluationJob> EvaluationJobs => [.. _evaluationJobs];
 
   /// <summary>Makes publishing this experiment's jobs throw <see cref="JobPublishException"/>.</summary>
   /// <param name="experimentId">The experiment.</param>
@@ -24,6 +28,12 @@ public class FakeJobPublisher : IJobPublisher
   /// <returns>The jobs.</returns>
   public IReadOnlyList<TrainingJob> JobsFor(Guid experimentId) => [.. _jobs.Where(j => j.ExperimentId == experimentId)];
 
+  /// <summary>The evaluation jobs published for one experiment, oldest first.</summary>
+  /// <param name="experimentId">The experiment.</param>
+  /// <returns>The jobs.</returns>
+  public IReadOnlyList<EvaluationJob> EvaluationJobsFor(Guid experimentId) =>
+    [.. _evaluationJobs.Where(j => j.ExperimentId == experimentId)];
+
   /// <inheritdoc />
   public Task PublishTrainingJobAsync(TrainingJob job, CancellationToken cancellationToken)
   {
@@ -33,6 +43,18 @@ public class FakeJobPublisher : IJobPublisher
     }
 
     _jobs.Enqueue(job);
+    return Task.CompletedTask;
+  }
+
+  /// <inheritdoc />
+  public Task PublishEvaluationJobAsync(EvaluationJob job, CancellationToken cancellationToken)
+  {
+    if (_failing.ContainsKey(job.ExperimentId))
+    {
+      throw new JobPublishException("Couldn't queue the job: connection refused");
+    }
+
+    _evaluationJobs.Enqueue(job);
     return Task.CompletedTask;
   }
 }
