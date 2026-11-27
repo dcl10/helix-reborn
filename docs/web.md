@@ -40,7 +40,8 @@ web/
 │   │   ├── experiments/page.tsx # list + "New experiment" dialog
 │   │   ├── experiments/[id]/   # layout.tsx: header, edit/delete, tabs; page.tsx redirects to ./data (#38
 │   │   │                       # replaces it with an overview); data/, eda/, pipelines/, runs/,
-│   │   │                       # evaluations/, predict/, files/ page.tsx, the last six placeholders
+│   │   │                       # evaluations/ (+ new/, [evaluationId]/), predict/, files/ page.tsx; predict/
+│   │   │                       # and files/ are placeholders
 │   │   └── admin/users/page.tsx # admin-only Users page: invite, resend, revoke
 │   └── api/
 │       ├── auth/[...nextauth]/ # Auth.js endpoints; /session is cut down so tokens never reach the browser
@@ -162,8 +163,9 @@ Dataset uploads go through `proxy.ts`, which otherwise buffers request bodies to
   for PCA, plus perplexity for t-SNE. The limits are the EDA service's own. `toPlotRequest` sends only the chosen
   type's fields, in snake_case, with an empty column list or choice as `null` ("all numeric columns" / "none").
   Generate shows a spinner and "This can take up to a minute"; the API's error (EDA's own message) shows inline.
-- **`plot-options-form.tsx`** (`PlotOptionsForm`) is the builder's collapsible "Plot options": title, style, colour
-  map, size, DPI, fonts and label rotation. Empty fields are left out so EDA's defaults apply. The keys are
+- **`plot-options-form.tsx`** (`PlotOptionsForm`) is the collapsible "Plot options": title, style, colour
+  map, size, DPI, fonts and label rotation. It's generic over any form with a `plotOptions` object
+  (`plotOptionsSchema`), so the new evaluation form reuses it. Empty fields are left out so EDA's defaults apply. The keys are
   snake_case (`title_font_size`): the API passes `plotOptions` to EDA as-is, and EDA rejects unknown keys.
 - **`form-fields.tsx`** has the builder's field helpers, each a `Controller` around a shadcn `field`:
   `SelectField` (Base UI `Select` with an `items` map, plus an optional "none" choice stored as `""`),
@@ -171,9 +173,9 @@ Dataset uploads go through `proxy.ts`, which otherwise buffers request bodies to
   list of `checkbox`es in a `scroll-area`, keeping the columns' order.
 - **`normality-table.tsx`** (`NormalityTable`) runs the normality tests on every numeric column and shows the
   latest run's results with a ✓/✗ "Normal (p > 0.05)" column. The API also saves each run as a CSV artifact.
-- **`plot-gallery.tsx`** (`PlotGallery`) shows the experiment's `edaPlot` artifacts, newest first, as cards with
-  the title, the image, when it was made and a download link (`?download=true`). The image opens full size in a
-  `dialog`. Images are plain `<img loading="lazy">` from `/api/proxy/…/artifacts/{id}/content`: `next/image` can't
+- **`plot-gallery.tsx`** (`PlotGallery`) shows the experiment's `edaPlot` artifacts, newest first, with the shared
+  `components/artifacts/artifact-gallery.tsx` (`ArtifactGallery`): cards with the title, the image, optionally when
+  it was made, and a download link (`?download=true`). The image opens full size in a `dialog`. Images are plain `<img loading="lazy">` from `/api/proxy/…/artifacts/{id}/content`: `next/image` can't
   fetch through the authenticated proxy.
 - **`use-eda.ts`** wraps `lib/eda.ts` in TanStack Query: `useEdaSummary` (409 becomes `null`), `useEdaArtifacts`,
   and the `useCreatePlot` and `useRunNormalityTests` mutations, which refresh the artifacts and never retry
@@ -276,10 +278,10 @@ Running a pipeline creates a training run ([api.md](api.md#training-runs)), whic
   - Results, when it succeeded: rows used, the cross-validation metrics (mean ± std) and the search's best params.
   - The pipeline it ran: data, split, steps and params, model, search.
   - Its files (the run's artifacts) with downloads.
-  - "Evaluate this model" (succeeded runs only) is disabled with a "Coming soon" tooltip until #35.
-- **`components/runs/use-run-events.ts`** (`useRunEvents`): follows the run's server-sent events. It `fetch`es the
-  proxy's `…/runs/{runId}/events`, reads the body with a stream reader, and parses it with `SseParser`
-  (`lib/sse.ts`).
+  - "Evaluate this model" (succeeded runs only) links to `evaluations/new?runId=…`.
+- **`components/runs/use-run-events.ts`** (`useRunEvents`): follows the run's server-sent events with the shared
+  **`components/jobs/use-job-events.ts`** (`useJobEvents`, also used for evaluations). It `fetch`es the events URL
+  through the proxy, reads the body with a stream reader, and parses it with `SseParser` (`lib/sse.ts`).
   - Each `status` event goes into the TanStack cache (the run, and its row in the runs list), and `end` stops it.
   - Before writing, it cancels any in-flight fetch of the run, so an older response can't land afterwards and undo a
     newer event.
@@ -289,6 +291,43 @@ Running a pipeline creates a training run ([api.md](api.md#training-runs)), whic
   `useStartRun` (never retried: a retry after a slow success would start a second run).
 - **`lib/runs.ts`**: the `Run` and `TrainingResult` types (`status` camelCase as the API sends it; `spec` and `result`
   snake_case, passed through), the fetchers, `runEventsUrl`, `headlineMetric`, `formatMetric` and `formatDuration`.
+
+## Evaluations
+
+Evaluating a succeeded run's model creates an evaluation ([api.md](api.md#evaluations),
+[evaluation.md](evaluation.md)). The Evaluations tab (`/experiments/[id]/evaluations`) lists them,
+`evaluations/new` (`?runId=` preselects the run) starts one, and `evaluations/[evaluationId]` follows it live and
+shows its results.
+
+- **`components/evaluations/evaluations-table.tsx`** (`EvaluationsTable`): run (pipeline name, links to the
+  evaluation), status (`RunStatusBadge`), the headline **test** metric (accuracy, else R²), created and duration, with
+  a "New evaluation" link. Re-read every 3 seconds while any is queued or running.
+- **`components/evaluations/evaluation-form.tsx`** (`EvaluationForm`): react-hook-form + zod
+  (`evaluationFormSchema` in `lib/evaluations.ts`).
+  - Run select (succeeded runs only, `"<pipelineName> · <createdAt>"`), the performance plots checkbox, global
+    (Permutation, SHAP, repeats 1–100), local (LIME, SHAP, max samples 1–1000), ensemble (Mean, Majority vote),
+    fuzzy (a switch revealing its fields; cluster names comma-separated), features to plot (1–50) and the shared
+    `PlotOptionsForm`.
+  - The API's dependency rules (fuzzy needs a local and an ensemble method; ensembles need a global method; one
+    cluster name per cluster) are in the schema's `superRefine`. Because they span fields, the form re-checks the
+    whole schema on every change (`useWatch` + `safeParse`) and shows those messages inline; submit stays disabled
+    until it passes.
+  - On submit `toEvaluationOptions` builds the snake_case options (empty plot options left out), and on 202 it opens
+    the evaluation. A 400's `errors.options` messages, or any other error's message, show in an alert.
+- **`components/evaluations/evaluation-detail.tsx`** (`EvaluationDetail`): status and progress (live over SSE via
+  `useEvaluationEvents`, falling back to polling), the error when it failed, and when it succeeded:
+  - **Metrics**: `metrics-table.tsx` (`MetricsTable`), train vs test, read from the `metrics.json` artifact's content
+    (the event's `metrics` has only the test set).
+  - **Plots**: `evaluationPlot` artifacts grouped by `groupEvaluationPlots` (file-name prefix): Performance
+    (`confusion_*`, `roc_*`, `precision_*`, `predicted_*`, `residual*`), Global importance (`global_*`), Local
+    importance (`local_*`), Ensemble (`ensemble_*`), Fuzzy (`fuzzy_*`), then Other; each with `ArtifactGallery`.
+  - **Tables**: each `evaluationTable` artifact in a collapsible with a download link, rendered by `csv-table.tsx`
+    (`CsvTable`): the content fetched through the proxy, parsed by `parseCsv` (RFC 4180 quoting), first 50 rows.
+- **`components/evaluations/use-evaluations.ts`**: `useEvaluations`, `useEvaluation` (optional polling),
+  `useEvaluationArtifacts`, `useArtifactContent` (a JSON or text artifact, cached forever), `useMetricsFile` and
+  `useStartEvaluation` (never retried).
+- **`lib/evaluations.ts`**: the `Evaluation` and options types, the fetchers, `evaluationEventsUrl`, the form schema,
+  `defaultEvaluationValues`, `toEvaluationOptions`, `groupEvaluationPlots`, `parseCsv` and `headlineTestMetric`.
 
 ## Admin: users
 

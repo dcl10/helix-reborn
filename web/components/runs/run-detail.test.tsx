@@ -92,8 +92,8 @@ describe("RunDetail", () => {
       "/api/proxy/experiments/exp-1/artifacts/a-1/content?download=true",
     );
     expect(
-      screen.getByRole("button", { name: "Evaluate this model" }),
-    ).toBeDisabled();
+      screen.getByRole("link", { name: "Evaluate this model" }),
+    ).toHaveAttribute("href", "/experiments/exp-1/evaluations/new?runId=run-1");
   });
 
   it("shows a running run's progress and message", async () => {
@@ -137,7 +137,7 @@ describe("RunDetail", () => {
     expect(await screen.findByText("OnnxParityError")).toBeInTheDocument();
     expect(screen.getByText("ONNX probabilities differ")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Evaluate this model" }),
+      screen.queryByRole("link", { name: "Evaluate this model" }),
     ).not.toBeInTheDocument();
   });
 });

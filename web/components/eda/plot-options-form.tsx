@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import type { Control } from "react-hook-form";
+import type { Control, FieldPath, FieldValues } from "react-hook-form";
 
 import {
   NumberField,
@@ -14,7 +14,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { PLOT_STYLES, type PlotValues } from "@/lib/eda";
+import { PLOT_STYLES } from "@/lib/eda";
 
 const styleOptions = PLOT_STYLES.map((style) => ({
   value: style,
@@ -22,12 +22,18 @@ const styleOptions = PLOT_STYLES.map((style) => ({
 }));
 
 /**
- * The plot builder's collapsible "Plot options" section: title, style, size and fonts. Every field is optional;
- * anything left empty uses the EDA service's default.
- * @param control - the plot builder form's control
+ * A collapsible "Plot options" section: title, style, size and fonts, bound to the form's `plotOptions` fields
+ * (`plotOptionsSchema`). Every field is optional; anything left empty uses the service's default. Used by the EDA plot
+ * builder and the new evaluation form.
+ * @param control - the form's control; its values have a `plotOptions` object
  * @returns the section
  */
-export function PlotOptionsForm({ control }: { control: Control<PlotValues> }) {
+export function PlotOptionsForm<T extends FieldValues>({
+  control,
+}: {
+  control: Control<T>;
+}) {
+  const name = (field: string) => `plotOptions.${field}` as FieldPath<T>;
   return (
     <Collapsible>
       <CollapsibleTrigger
@@ -47,73 +53,73 @@ export function PlotOptionsForm({ control }: { control: Control<PlotValues> }) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             control={control}
-            name="plotOptions.title"
+            name={name("title")}
             label="Title"
             placeholder="Default title"
           />
           <SelectField
             control={control}
-            name="plotOptions.style"
+            name={name("style")}
             label="Style"
             options={styleOptions}
             noneLabel="Default (whitegrid)"
           />
           <TextField
             control={control}
-            name="plotOptions.colour_map"
+            name={name("colour_map")}
             label="Colour map"
             placeholder="viridis"
           />
           <NumberField
             control={control}
-            name="plotOptions.width"
+            name={name("width")}
             label="Width (inches)"
             min={0}
             step={0.5}
           />
           <NumberField
             control={control}
-            name="plotOptions.height"
+            name={name("height")}
             label="Height (inches)"
             min={0}
             step={0.5}
           />
           <NumberField
             control={control}
-            name="plotOptions.dpi"
+            name={name("dpi")}
             label="DPI"
             min={50}
             max={600}
           />
           <TextField
             control={control}
-            name="plotOptions.font_family"
+            name={name("font_family")}
             label="Font family"
             placeholder="sans-serif"
           />
           <NumberField
             control={control}
-            name="plotOptions.title_font_size"
+            name={name("title_font_size")}
             label="Title font size"
           />
           <NumberField
             control={control}
-            name="plotOptions.axis_font_size"
+            name={name("axis_font_size")}
             label="Axis font size"
           />
           <NumberField
             control={control}
-            name="plotOptions.tick_size"
+            name={name("tick_size")}
             label="Tick label size"
           />
           <NumberField
             control={control}
-            name="plotOptions.rotate_x_labels"
+            name={name("rotate_x_labels")}
             label="Rotate x labels (°)"
           />
           <NumberField
             control={control}
-            name="plotOptions.rotate_y_labels"
+            name={name("rotate_y_labels")}
             label="Rotate y labels (°)"
           />
         </div>
