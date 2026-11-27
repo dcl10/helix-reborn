@@ -31,7 +31,7 @@ def test_handle_returns_test_metrics_and_metrics_artifact(classification_env) ->
     }
     written = storage.get_json("experiments/e/evaluations/v/metrics.json")
     assert written["test"] == result["metrics"]
-    assert [status for status, _ in events] == ["progress", "progress"]
+    assert [status for status, _ in events] == ["progress"] * 3
 
 
 def test_handle_regression(regression_env) -> None:
