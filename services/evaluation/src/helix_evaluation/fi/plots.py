@@ -181,3 +181,48 @@ def plot_shap_waterfall(
     fig.axes[0].set_title(opts.title or title, fontsize=opts.title_font_size)
     fig.tight_layout()
     return fig
+
+
+def plot_ensemble_importance(
+    df: pd.DataFrame,
+    std_df: pd.DataFrame,
+    column: str,
+    opts: PlotOptions,
+    num_features_to_plot: int,
+    title: str,
+) -> Figure:
+    """Plot a bar chart of the top features by ensemble importance.
+
+    Port of the original Helix's ``plot_bar_chart``.
+
+    Args:
+        df: Ensemble importances, indexed by feature, as returned by
+            :func:`~helix_evaluation.fi.ensemble.ensemble_mean` or
+            :func:`~helix_evaluation.fi.ensemble.ensemble_majority_vote`.
+        std_df: Their standard deviations, used as error bars where present (all
+            ``NaN`` for a single model, in which case no error bars are drawn).
+        column: The importance column of ``df`` and ``std_df``.
+        opts: Shared plot styling options.
+        num_features_to_plot: The number of top features to plot.
+        title: The plot's title.
+
+    Returns:
+        The rendered figure, most important feature first.
+    """
+    top = df.sort_values(by=column, ascending=False).head(num_features_to_plot)
+    errors = std_df[column].reindex(top.index) if column in std_df else None
+    if errors is not None and errors.isna().all():
+        errors = None
+
+    apply_style(opts)
+    fig = Figure(figsize=(opts.width, opts.height), dpi=opts.dpi)
+    ax = fig.add_subplot(111)
+    ax.bar(
+        top.index.astype(str),
+        top[column],
+        yerr=None if errors is None else errors.fillna(0).to_numpy(),
+        capsize=5,
+    )
+    finish_axes(ax, opts, title, "Feature", "Importance")
+    fig.tight_layout()
+    return fig
