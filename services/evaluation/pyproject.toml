@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "helix-core",
     "lime>=0.2.0.1",
+    "scikit-fuzzy>=0.5",
     "shap>=0.46",
 ]
 

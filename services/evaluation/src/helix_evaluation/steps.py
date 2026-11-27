@@ -5,8 +5,7 @@ decides for itself whether it applies to a job's options
 (:meth:`EvaluationStep.enabled`) and, when it does, reads and writes the shared
 :class:`~helix_evaluation.context.EvaluationContext`. Keeping the list in one place
 (rather than scattered registrations) makes the order plots, global/local feature
-importance, ensembling and fuzzy interpretability run in obvious at a glance; later
-issues (#33) insert their step at the right position.
+importance, ensembling and fuzzy interpretability run in obvious at a glance.
 """
 
 import logging
@@ -20,6 +19,7 @@ import shap
 from helix_core.messages import EvaluationOptions
 from helix_evaluation.context import EvaluationContext
 from helix_evaluation.fi.ensemble import EnsembleStep
+from helix_evaluation.fi.fuzzy import FuzzyStep
 from helix_evaluation.fi.global_methods import (
     normalise,
     permutation_importance_df,
@@ -366,9 +366,10 @@ STEPS: list[EvaluationStep] = [
     GlobalImportanceStep(),
     LocalImportanceStep(),
     EnsembleStep(),
+    FuzzyStep(),
 ]
 """Every evaluation step, in run order: metrics, plots, global FI, local FI, ensemble,
-fuzzy. Everything up to ``ensemble`` is implemented so far (#33 appends fuzzy)."""
+fuzzy."""
 
 
 def run_steps(ctx: EvaluationContext, progress: Progress) -> None:
