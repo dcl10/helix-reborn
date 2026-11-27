@@ -49,8 +49,8 @@ needing their own ONNX code:
 `steps.py` defines `EvaluationStep`, a `Protocol` with `name`, `weight` (its share of the progress bar), `enabled(options)`
 and `run(ctx)`, and `STEPS`, the single ordered list every evaluation job runs: **metrics, plots, global feature
 importance, local feature importance, ensemble, fuzzy**. Keeping the order in one list, rather than scattered
-registrations, makes the run order obvious at a glance; issues #31–#33 each append their step at the right position.
-`STEPS` currently holds `MetricsStep`, `PlotsStep` and `GlobalImportanceStep`.
+registrations, makes the run order obvious at a glance; issues #32–#33 each append their step at the right position.
+`STEPS` currently holds `MetricsStep`, `PlotsStep`, `GlobalImportanceStep` and `LocalImportanceStep`.
 
 `run_steps(ctx, progress)` runs every step whose `enabled(ctx.job.options)` is `True`, in list order, and calls
 `progress(fraction, step.name)` after each one, with `fraction` the cumulative weight of finished steps over the
@@ -127,6 +127,35 @@ x_train, 100, random_state=seed)`.
 `ctx.results["global_importance"]` is set to a `pandas.DataFrame` indexed by feature, with a `"Permutation"` and/or
 `"SHAP"` column (only for the methods that ran) holding each method's importances min-max scaled to `[0, 1]` by
 `normalise` (a constant series becomes all zeros). This is the shape the ensemble step (#32) averages across methods.
+
+## Local feature importance
+
+`LocalImportanceStep` (`fi/local_methods.py`, `fi/plots.py`), ported from the original Helix's
+`services/feature_importance/local_methods.py` and the violin plot from `services/plotting.py`
+(`plot_most_important_feats_violin`). Enabled when `options.local_methods` is non-empty; it lists any of `"lime"`,
+`"shap"`. Where global importance gives one number per feature, local importance explains individual predictions: one
+value per feature **per test row**.
+
+It explains the first `min(options.local_max_samples, len(x_test))` test rows after a shuffle seeded with
+`metadata.pipeline.split.random_seed`. LIME is slow (it fits a surrogate model per row), which is why the sample is
+capped.
+
+- **LIME** (`lime_values`): `LimeTabularExplainer(x_train, mode=problem_type, discretize_continuous=True,
+  random_state=seed)`. Classification explains `predict_proba` — the positive class (label 1) for binary problems, the
+  top predicted label for multi-class; regression explains `predict`. Each explanation's `(feature_index, weight)`
+  pairs from `as_map()` are mapped back to their column, so values line up with features. (The original Helix read
+  `local_exp[1]`, which is ordered by importance rather than by feature, and assumed label 1.) LIME's warnings are
+  silenced inside the call only. Writes table `local_lime` and plot `local_lime_violin`.
+- **SHAP** (`local_shap_values`): `shap.Explainer(ctx.model.predict, shap.sample(x_train, 100, random_state=seed))`,
+  as for global SHAP. Writes table `local_shap`, plot `local_shap_violin` and plot `local_shap_waterfall_0` (the
+  first explained row's waterfall, `num_features_to_plot` bars).
+
+The violin plots show the distribution of each feature's local values for the top `options.num_features_to_plot`
+features by mean |value|. Tables have one row per explained sample (indexed by its position in the test set) and
+one column per feature, in the model's feature order.
+
+`ctx.results["local_importance"]` is `{"LIME": df, "SHAP": df}` with only the methods that ran — the input the fuzzy
+step (#33) reads.
 
 ## Outputs
 

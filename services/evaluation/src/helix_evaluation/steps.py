@@ -6,7 +6,7 @@ decides for itself whether it applies to a job's options
 :class:`~helix_evaluation.context.EvaluationContext`. Keeping the list in one place
 (rather than scattered registrations) makes the order plots, global/local feature
 importance, ensembling and fuzzy interpretability run in obvious at a glance; later
-issues (#31-#33) insert their step at the right position.
+issues (#32-#33) insert their step at the right position.
 """
 
 import logging
@@ -24,10 +24,13 @@ from helix_evaluation.fi.global_methods import (
     permutation_importance_df,
     shap_global_df,
 )
+from helix_evaluation.fi.local_methods import lime_values, local_shap_values
 from helix_evaluation.fi.plots import (
     plot_global_shap_importance,
+    plot_local_importance_violin,
     plot_permutation_importance,
     plot_shap_beeswarm,
+    plot_shap_waterfall,
 )
 from helix_evaluation.metrics import MetricsStep
 from helix_evaluation.plots import (
@@ -270,10 +273,101 @@ class GlobalImportanceStep:
         ctx.results["global_importance"] = pd.DataFrame(columns)
 
 
-STEPS: list[EvaluationStep] = [MetricsStep(), PlotsStep(), GlobalImportanceStep()]
+class LocalImportanceStep:
+    """Computes local feature importance: LIME and per-sample SHAP values.
+
+    Ported from the original Helix's ``local_methods.py`` and
+    ``FeatureImportanceEstimator._local_feature_importance``, run once on the ONNX
+    model adapter rather than per fold.
+    """
+
+    name = "local_importance"
+    weight = 0.25
+
+    def enabled(self, options: EvaluationOptions) -> bool:
+        """Return ``True`` when at least one local method is requested.
+
+        Args:
+            options: The evaluation job's options.
+
+        Returns:
+            ``True`` if ``options.local_methods`` is non-empty.
+        """
+        return bool(options.local_methods)
+
+    def run(self, ctx: EvaluationContext) -> None:
+        """Run the enabled local methods and store their per-sample results.
+
+        Explains the first ``min(options.local_max_samples, len(x_test))`` test
+        rows after a seeded shuffle (``random_state =
+        metadata.pipeline.split.random_seed``). The SHAP background is
+        ``shap.sample(x_train, 100, random_state=seed)``. Writes ``local_lime``
+        and/or ``local_shap`` tables and plots, and sets
+        ``ctx.results["local_importance"]`` to ``{"LIME": df, "SHAP": df}``,
+        including only the methods that ran.
+
+        Args:
+            ctx: The evaluation context to read the model and data from, and to
+                write tables, plots and the ``local_importance`` result into.
+        """
+        options = ctx.job.options
+        seed = ctx.metadata.pipeline.split.random_seed
+        n_plot = options.num_features_to_plot
+
+        n_samples = min(options.local_max_samples, len(ctx.x_test))
+        x_explain = ctx.x_test.sample(frac=1, random_state=seed).head(n_samples)
+
+        results: dict[str, pd.DataFrame] = {}
+
+        if "lime" in options.local_methods:
+            lime_df = lime_values(
+                ctx.model,
+                ctx.x_train,
+                x_explain,
+                ctx.metadata.problem_type,
+                random_state=seed,
+            )
+            ctx.save_table("local_lime", lime_df, "LIME values")
+            title = "LIME: most important features"
+            ctx.save_plot(
+                "local_lime_violin",
+                plot_local_importance_violin(lime_df, ctx.plot_options, n_plot, title),
+                title,
+            )
+            results["LIME"] = lime_df
+
+        if "shap" in options.local_methods:
+            x_background = shap.sample(
+                ctx.x_train, _SHAP_BACKGROUND_ROWS, random_state=seed
+            )
+            shap_df, explanation = local_shap_values(ctx.model, x_background, x_explain)
+            ctx.save_table("local_shap", shap_df, "Local SHAP values")
+            title = "Local SHAP: most important features"
+            ctx.save_plot(
+                "local_shap_violin",
+                plot_local_importance_violin(shap_df, ctx.plot_options, n_plot, title),
+                title,
+            )
+            title = "SHAP waterfall: first explained sample"
+            ctx.save_plot(
+                "local_shap_waterfall_0",
+                plot_shap_waterfall(explanation[0], ctx.plot_options, n_plot, title),
+                title,
+            )
+            results["SHAP"] = shap_df
+
+        ctx.results["local_importance"] = results
+
+
+STEPS: list[EvaluationStep] = [
+    MetricsStep(),
+    PlotsStep(),
+    GlobalImportanceStep(),
+    LocalImportanceStep(),
+]
 """Every evaluation step, in run order: metrics, plots, global FI, local FI, ensemble,
-fuzzy. ``metrics``, ``plots`` and ``global_importance`` are implemented so far
-(#31-#33 append the rest)."""
+fuzzy. Everything up to ``local_importance`` is implemented so far (#32-#33 append
+the rest)."""
 
 
 def run_steps(ctx: EvaluationContext, progress: Progress) -> None:
