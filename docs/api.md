@@ -17,9 +17,9 @@ api/
     appsettings.json             defaults; appsettings.Development.json overrides for local dev
     Auth/                        Keycloak JWT setup, role claims, ICurrentUser
     Config/                      options classes (KeycloakOptions, HelixOptions, InvitationOptions, S3Options, EdaOptions,
-                                 ContractsOptions, RabbitMqOptions)
+                                 ContractsOptions, RabbitMqOptions, PredictionOptions)
     Controllers/                 one per resource, thin
-    Filters/                     MVC filters (RejectOversizedUploadAttribute)
+    Filters/                     MVC filters (RejectOversizedUploadAttribute, PredictionUploadLimitFilter)
     Messaging/                   RabbitMQ: queue topology, job messages, publisher, jobs.events consumer
     Models/                      request/response types
     Data/                        AppDbContext, design-time factory, migrations
@@ -33,6 +33,8 @@ api/
       Runs/                      IRunService, RunService, RunEventHandler (training job events)
       Evaluations/               IEvaluationService, EvaluationService, EvaluationEventHandler (evaluation job events),
                                  EvaluationOptionsValidator and their exceptions
+      Predictions/               IPredictionService, PredictionService, OnnxModelCache, ModelMetadata and their
+                                 exceptions
       Jobs/                      JobStatusFeed: polling a run or evaluation and streaming it as server-sent events
       Contracts/                 ContractFiles: finding files under contracts/
       Invitations/               IInvitationService, InvitationService, InvitationConflictException
@@ -42,6 +44,7 @@ api/
   tests/HelixReborn.Api.Tests/
     Fixtures/                    ApiFactory, test auth handler, test-only admin controller, InMemoryKeycloakUserAdmin,
                                  InMemoryObjectStorage, FakeEdaClient
+      models/                    ONNX model fixtures for the prediction tests (made by make_test_models.py)
 ```
 
 ## Configuration
@@ -75,6 +78,8 @@ first use.
 - **`RabbitMq`** (`RabbitMqOptions`) — `Url`, an `amqp://` or `amqps://` URL with credentials. The default is the local
   Compose broker (`amqp://helix:dev_password@localhost:5672/`); set `RabbitMq__Url` everywhere else. See
   [Training runs](#training-runs).
+- **`Predictions`** (`PredictionOptions`) — `MaxUploadBytes` (default 10 MB), `MaxRows` (default 100,000) and
+  `ModelCacheSize` (default 10 runs). See [Predictions](#predictions).
 
 ## Auth
 
@@ -446,6 +451,88 @@ Tests: `EvaluationsControllerTests`, `EvaluationEventHandlerTests` (calling the 
 `EvaluationOptionsValidatorTests`, and `JobMessagesSchemaTests` validating the serialized `EvaluationJob` against the
 contract schema. `Fixtures/EvaluationSetup.cs` builds a succeeded run and applies evaluation events.
 
+## Predictions
+
+A succeeded run's model makes predictions on an uploaded CSV **inside the API**, with ONNX Runtime
+(`Microsoft.ML.OnnxRuntime`) on the run's `model.onnx` and `metadata.json` (see
+[architecture.md](architecture.md#model-artifacts)). No Python is involved: this is what shows the ONNX models are
+portable. Prediction is synchronous, one request per upload. Only the owner can predict; the owner or `helix-admin`
+can list.
+
+| Method | Route | Does |
+| --- | --- | --- |
+| `POST` | `/api/experiments/{id}/runs/{runId}/predictions` | Multipart, field `file`, a CSV. Predicts, stores the output CSV and records it as an artifact. `201` with a `PredictionResponse`; `Location` is the artifact's `/content`. |
+| `GET` | `/api/experiments/{id}/predictions` | `ArtifactResponse[]`: the experiment's artifacts with `sourceType` `prediction`, oldest first. |
+
+```json
+// PredictionResponse
+{ "predictionId": "…", "runId": "…", "rowCount": 120, "artifactId": "…",
+  "columns": ["sample_id", "prediction", "probability_no", "probability_yes"],
+  "preview": [ { "sample_id": "S1", "prediction": "yes", "probability_no": 0.12, "probability_yes": 0.88 } ] }
+```
+
+**Input.** The upload is checked like a dataset upload: a `.csv` extension and one of the dataset content types.
+Columns are matched to `metadata.feature_columns` **by header name** (exact, case-sensitive), so column order doesn't
+matter and extra columns, including the target, are ignored. Each value is parsed as `float32` with the invariant
+culture; a blank becomes `NaN`, which the pipeline's imputer fills if it has one (a pipeline without an imputer gives
+`NaN` predictions for that row). The features go to the model's `onnx_input_name` as a `float32` `[N, F]` tensor, in
+`feature_columns` order.
+
+**Output CSV**, stored at `StorageKeys.Prediction(e, p)` (`experiments/{e}/predictions/{p}/predictions.csv`):
+
+- The ID column first, when `metadata.id_column` is set and the upload has that column.
+- `prediction`: the class label (`classes[label]`) for classification, the value for regression.
+- For classification, one `probability_<class>` column per class, in `classes` order.
+- Numbers are written with the invariant culture in round-trip (`R`) format.
+
+Outputs are read **by name** from `metadata.onnx_outputs` (`label` is `int64`, `probabilities` and `value` are
+`float32`), never by position. The response's `preview` is the first 20 output rows; non-finite numbers are `null`
+there (JSON has no `NaN`) and `NaN` in the CSV. The artifact is kind `predictions`, title
+`"Predictions: <upload file name>"`, `text/csv`, `sourceType` `"prediction"` and `sourceId` the prediction ID. There is
+no prediction table: the artifact is the record.
+
+**Limits** (`Predictions` options). The upload and its feature matrix are held in memory for the request, so:
+
+| Option | Default | Over it |
+| --- | --- | --- |
+| `MaxUploadBytes` | 10 MB (the whole multipart request) | `413`, from `PredictionUploadLimitFilter` |
+| `MaxRows` | 100,000 data rows | `400` |
+| `ModelCacheSize` | 10 runs | The least recently used model is evicted |
+
+`PredictionUploadLimitFilter` does for an options-driven limit what `[RequestSizeLimit]`, `[RequestFormLimits]` and
+`RejectOversizedUploadAttribute` do for the dataset upload's constant one.
+
+**Model cache.** `OnnxModelCache` (a singleton) holds an `InferenceSession` and the parsed `ModelMetadata` per run,
+loaded from S3 on first use. It's an LRU bounded by `ModelCacheSize`. Sessions are safe for concurrent `Run`, so every
+request for a run shares one, and concurrent first requests share one load. Each request holds a `ModelLease` while
+it uses the model, so an evicted session is only disposed once the last request using it is done. A failed load
+(missing files, invalid metadata, a model ONNX Runtime can't load) isn't cached.
+
+Errors:
+
+| Cause | Response |
+| --- | --- |
+| Experiment or run missing or not visible, or an admin predicting | `404` |
+| Not a CSV, no data rows, missing feature columns (all named), values that aren't numbers (`"Row 2, column 'f1': 'abc' isn't a number."`, the first 10 and a count of the rest), or more than `MaxRows` rows | `400` `ValidationProblemDetails`, `errors.file` |
+| The run isn't `succeeded`, or its model files are missing or unusable | `409` |
+| The request is over `MaxUploadBytes` | `413` |
+
+**Docker.** ONNX Runtime ships native libraries for `linux-x64` and `linux-arm64`, which `dotnet publish` puts under
+`runtimes/` (framework-dependent publish keeps every RID's folder). They need glibc: the Debian-based
+`mcr.microsoft.com/dotnet/aspnet` image works, and Alpine images don't.
+
+Tests: `PredictionsControllerTests` and `OnnxModelCacheTests`. They use the ONNX models in
+`tests/HelixReborn.Api.Tests/Fixtures/models/{classification,regression}/`, made by helix-core's own pipeline builder
+and exporter: a `standard_scaler` + `logistic_regression` classifier with string classes `no`/`yes` and an ID column,
+and a `simple_imputer` + `ridge` regressor. Each folder's `expected.json` holds ONNX Runtime's (Python) predictions for
+3 fixed rows, and the tests check the API gives the same labels, probabilities within `1e-5` and values within `1e-4`.
+Regenerate them after changing the exporter:
+
+```bash
+cd services && uv run python packages/helix-core/scripts/make_test_models.py \
+  --out ../api/tests/HelixReborn.Api.Tests/Fixtures/models
+```
+
 ## Running it
 
 ```bash
@@ -485,8 +572,8 @@ isolated and can run in parallel.
 - There's no Keycloak in tests: `TestAuthHandler` reads claims from an `X-Test-Claims` header instead of validating a
   JWT. `ApiFactory.CreateAnonymousClient()`, `CreateUserClient(...)` and `CreateAdminClient()` build clients with the
   right header set.
-- `ApiFactory` replaces `IObjectStorage` with `InMemoryObjectStorage`, a dictionary keyed by object key, so tests
-  never need RustFS, and `IEdaClient` with `FakeEdaClient`, so they never need the EDA service.
+- `ApiFactory` replaces `IObjectStorage` with `InMemoryObjectStorage`, a dictionary keyed by object key that also
+  counts reads per key, so tests never need RustFS, and `IEdaClient` with `FakeEdaClient`, so they never need the EDA service.
 - `TestAdminController` (test assembly only) exercises the `AdminOnly` policy before the app has a real admin
   endpoint.
 
