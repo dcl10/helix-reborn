@@ -21,6 +21,11 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- ONNX models made by services/packages/helix-core/scripts/make_test_models.py, for the prediction tests -->
+  <ItemGroup>
+    <None Include="Fixtures\models\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\HelixReborn.Api\HelixReborn.Api.csproj" />
   </ItemGroup>

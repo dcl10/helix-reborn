@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "run_id": "9995e84f-6095-4219-ad23-55a72f72075c",
+  "problem_type": "classification",
+  "target_column": "label",
+  "feature_columns": [
+    "f0",
+    "f1",
+    "f2"
+  ],
+  "id_column": "sample_id",
+  "classes": [
+    "no",
+    "yes"
+  ],
+  "onnx_input_name": "input",
+  "onnx_outputs": {
+    "label": "label",
+    "probabilities": "probabilities"
+  },
+  "pipeline": {
+    "problem_type": "classification",
+    "target_column": "label",
+    "feature_columns": [
+      "f0",
+      "f1",
+      "f2"
+    ],
+    "id_column": "sample_id",
+    "split": {
+      "test_size": 0.2,
+      "random_seed": 42,
+      "cv_folds": null
+    },
+    "steps": [
+      {
+        "step": "standard_scaler",
+        "params": {}
+      }
+    ],
+    "model": {
+      "step": "logistic_regression",
+      "params": {}
+    },
+    "search": null
+  },
+  "library_versions": {
+    "scikit-learn": "1.8.0",
+    "skl2onnx": "1.20.0",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.32.0",
+    "xgboost": "3.4.1",
+    "numpy": "2.5.5"
+  },
+  "helix_version": "dev",
+  "created_at": "2026-11-28T12:08:19.520335Z"
+}
