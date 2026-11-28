@@ -7,6 +7,18 @@ using Services.Storage;
 public class InMemoryObjectStorage : IObjectStorage
 {
   private readonly ConcurrentDictionary<string, (byte[] Content, string ContentType, DateTimeOffset LastModified)> _objects = new();
+  private readonly ConcurrentDictionary<string, int> _reads = new();
+
+  /// <summary>How many times <see cref="OpenReadAsync"/> has been called for a key.</summary>
+  /// <param name="key">The object key.</param>
+  /// <returns>The number of reads.</returns>
+  public int ReadCount(string key) => _reads.GetValueOrDefault(key);
+
+  /// <summary>Gets an object's content and content type, if it exists.</summary>
+  /// <param name="key">The object key.</param>
+  /// <returns>The object, or null.</returns>
+  public (byte[] Content, string ContentType)? Get(string key) =>
+    _objects.TryGetValue(key, out var stored) ? (stored.Content, stored.ContentType) : null;
 
   /// <inheritdoc />
   public async Task PutAsync(
@@ -21,10 +33,13 @@ public class InMemoryObjectStorage : IObjectStorage
   }
 
   /// <inheritdoc />
-  public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken = default) =>
-    _objects.TryGetValue(key, out var stored)
+  public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken = default)
+  {
+    _reads.AddOrUpdate(key, 1, (_, count) => count + 1);
+    return _objects.TryGetValue(key, out var stored)
       ? Task.FromResult<Stream>(new MemoryStream(stored.Content))
       : throw new ObjectNotFoundException(key);
+  }
 
   /// <inheritdoc />
   public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default) =>

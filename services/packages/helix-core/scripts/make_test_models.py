@@ -1,4 +1,4 @@
-"""Generates the ONNX model fixtures the API's prediction tests run against.
+r"""Generates the ONNX model fixtures the API's prediction tests run against.
 
 Builds a tiny classification pipeline (``standard_scaler`` + ``logistic_regression``)
 and a tiny regression pipeline (``simple_imputer`` + ``ridge``) with helix-core's own
@@ -9,7 +9,7 @@ fixture folder.
 
 Run from ``services/``::
 
-    uv run python packages/helix-core/scripts/make_test_models.py \\
+    uv run python packages/helix-core/scripts/make_test_models.py \
         --out ../api/tests/HelixReborn.Api.Tests/Fixtures/models
 """
 
@@ -33,7 +33,10 @@ N_FEATURES = 3
 
 
 def _write_fixture(
-    folder: Path, onnx_bytes: bytes, metadata: ModelMetadata, expected: dict
+    folder: Path,
+    onnx_bytes: bytes,
+    metadata: ModelMetadata,
+    expected: dict[str, object],
 ) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "model.onnx").write_bytes(onnx_bytes)
@@ -143,18 +146,20 @@ def _make_regression_fixture(out_dir: Path) -> None:
     )
     expected = {
         "ids": None,
-        "rows": [
-            [None if np.isnan(v) else v for v in row] for row in rows.tolist()
-        ],
+        "rows": [[None if np.isnan(v) else v for v in row] for row in rows.tolist()],
         "values": values.tolist(),
     }
     _write_fixture(out_dir / "regression", onnx_bytes, metadata, expected)
 
 
 def main() -> None:
+    """Writes the classification and regression fixtures under ``--out``."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--out", required=True, type=Path, help="Folder to write classification/ and regression/ fixtures under."
+        "--out",
+        required=True,
+        type=Path,
+        help="Folder to write classification/ and regression/ fixtures under.",
     )
     args = parser.parse_args()
 
