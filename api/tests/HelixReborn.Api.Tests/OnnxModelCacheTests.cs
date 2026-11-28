@@ -88,9 +88,10 @@ public sealed class OnnxModelCacheTests : IDisposable
     await AcquireAndReleaseAsync(cache, other); // evicts the held model
 
     Assert.Equal(1, cache.Count);
-    RunOnce(lease.Model); // still usable
+    RunOnce(lease.Model); // still usable while leased, though evicted
     lease.Dispose();
-    Assert.ThrowsAny<Exception>(() => RunOnce(lease.Model)); // disposed once released
+    // Not checked by running it again: Run on a disposed ORT session is a native use-after-free (it segfaults on
+    // Linux), which is exactly what the lease prevents.
   }
 
   [Fact]
