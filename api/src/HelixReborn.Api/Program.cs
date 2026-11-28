@@ -29,6 +29,9 @@ builder.Services.AddRuns();
 // Evaluations: EvaluationJobs for a succeeded run's model, with their events from jobs.events.
 builder.Services.AddEvaluations();
 
+// Predictions: a succeeded run's model.onnx, run in the API with ONNX Runtime on an uploaded CSV.
+builder.Services.AddPredictions();
+
 // Postgres via EF Core. Migrations are applied by the migrate image, never at startup.
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

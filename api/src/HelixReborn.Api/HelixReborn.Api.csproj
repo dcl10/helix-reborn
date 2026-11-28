@@ -30,6 +30,8 @@
     <PackageReference Include="JsonSchema.Net" />
     <!-- Training runs (#25): RabbitMQ publisher and jobs.events consumer -->
     <PackageReference Include="RabbitMQ.Client" />
+    <!-- Predictions (#36): ONNX Runtime runs a run's model.onnx -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
   </ItemGroup>
 
 </Project>

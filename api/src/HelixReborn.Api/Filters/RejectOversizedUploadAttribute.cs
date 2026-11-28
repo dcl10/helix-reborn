@@ -25,14 +25,28 @@ public sealed class RejectOversizedUploadAttribute(long maxBytes) : Attribute, I
   /// <param name="context">The resource filter context.</param>
   /// <param name="next">Runs the rest of the pipeline.</param>
   /// <returns>A task that completes when the filter has run.</returns>
-  public async Task OnResourceExecutionAsync(ResourceExecutingContext context, ResourceExecutionDelegate next)
+  public Task OnResourceExecutionAsync(ResourceExecutingContext context, ResourceExecutionDelegate next) =>
+    RejectOrContinueAsync(context, next, MaxBytes);
+
+  /// <summary>
+  /// Answers 413 if the request is larger than <paramref name="maxBytes"/>, otherwise reads the form (so model binding
+  /// reuses it) and runs the rest of the pipeline. Shared with filters whose limit comes from options.
+  /// </summary>
+  /// <param name="context">The resource filter context.</param>
+  /// <param name="next">Runs the rest of the pipeline.</param>
+  /// <param name="maxBytes">The largest request body allowed, in bytes.</param>
+  /// <returns>A task that completes when the filter has run.</returns>
+  internal static async Task RejectOrContinueAsync(
+    ResourceExecutingContext context,
+    ResourceExecutionDelegate next,
+    long maxBytes)
   {
     var httpContext = context.HttpContext;
     var request = httpContext.Request;
 
-    if (request.ContentLength > MaxBytes)
+    if (request.ContentLength > maxBytes)
     {
-      context.Result = TooLarge(httpContext);
+      context.Result = TooLarge(httpContext, maxBytes);
       return;
     }
 
@@ -45,7 +59,7 @@ public sealed class RejectOversizedUploadAttribute(long maxBytes) : Attribute, I
       }
       catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
       {
-        context.Result = TooLarge(httpContext);
+        context.Result = TooLarge(httpContext, maxBytes);
         return;
       }
       catch (InvalidDataException)
@@ -59,14 +73,15 @@ public sealed class RejectOversizedUploadAttribute(long maxBytes) : Attribute, I
 
   /// <summary>Builds the 413 problem response.</summary>
   /// <param name="httpContext">The current request.</param>
+  /// <param name="maxBytes">The limit that was exceeded, in bytes.</param>
   /// <returns>An <see cref="ObjectResult"/> holding the problem details.</returns>
-  private ObjectResult TooLarge(HttpContext httpContext)
+  private static ObjectResult TooLarge(HttpContext httpContext, long maxBytes)
   {
     var factory = httpContext.RequestServices.GetRequiredService<ProblemDetailsFactory>();
     var problem = factory.CreateProblemDetails(
       httpContext,
       StatusCodes.Status413PayloadTooLarge,
-      detail: $"The upload is larger than the {MaxBytes / (1024 * 1024)} MB limit.");
+      detail: $"The upload is larger than the {maxBytes / (1024 * 1024)} MB limit.");
 
     return new ObjectResult(problem) { StatusCode = StatusCodes.Status413PayloadTooLarge };
   }

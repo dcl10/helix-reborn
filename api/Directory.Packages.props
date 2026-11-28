@@ -36,6 +36,11 @@
     <PackageVersion Include="RabbitMQ.Client" Version="7.3.0" />
   </ItemGroup>
 
+  <!-- Predictions (#36): runs a run's model.onnx in the API. Debian-based aspnet images only; Alpine has no native lib -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
+  </ItemGroup>
+
   <!-- EF Core -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />

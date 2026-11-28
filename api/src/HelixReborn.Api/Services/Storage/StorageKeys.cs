@@ -2,9 +2,9 @@ namespace HelixReborn.Api.Services.Storage;
 
 /// <summary>
 /// S3 key layout, shared with the Python services (see <c>docs/architecture.md</c>, "Storage layout"). IDs are
-/// formatted lowercase with hyphens (<c>"D"</c>). The dataset and EDA keys are built here (the API tells EDA where to
-/// write); run, evaluation and prediction keys are built by the Python workers that write those files and recorded
-/// as <see cref="Models.Artifact"/>s, but follow the same layout.
+/// formatted lowercase with hyphens (<c>"D"</c>). The dataset, EDA and prediction keys are built here (the API tells
+/// EDA where to write, and writes predictions itself); the files under a run's or evaluation's prefix are named by the
+/// Python workers that write them and recorded as <see cref="Models.Artifact"/>s, but follow the same layout.
 /// </summary>
 public static class StorageKeys
 {
@@ -41,4 +41,11 @@ public static class StorageKeys
   /// <returns><c>experiments/{experimentId}/evaluations/{evaluationId}/</c></returns>
   public static string EvaluationPrefix(Guid experimentId, Guid evaluationId) =>
     $"{Experiment(experimentId)}evaluations/{evaluationId:D}/";
+
+  /// <summary>The key a prediction's output CSV is stored at. The API writes it (predictions run in the API).</summary>
+  /// <param name="experimentId">The experiment's ID.</param>
+  /// <param name="predictionId">The prediction's ID.</param>
+  /// <returns><c>experiments/{experimentId}/predictions/{predictionId}/predictions.csv</c></returns>
+  public static string Prediction(Guid experimentId, Guid predictionId) =>
+    $"{Experiment(experimentId)}predictions/{predictionId:D}/predictions.csv";
 }
